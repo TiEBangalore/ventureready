@@ -102,6 +102,16 @@ function db_init() {
   const _insAdmin = db.prepare(
     "INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) VALUES(?,?,datetime('now'))");
   _adminSeed.forEach((e) => _insAdmin.run(e, "seed"));
+  // Notifications: one row per important event, recorded even when email is off.
+  db.exec(`CREATE TABLE IF NOT EXISTS notification(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, recipient TEXT,
+      subject TEXT, body TEXT, urgency TEXT, created_at TEXT)`);
+  // Email outbox: one row per recipient. status: 'pending' | 'sent' | 'failed'.
+  // In record-only mode (no SMTP configured) rows simply stay 'pending'.
+  db.exec(`CREATE TABLE IF NOT EXISTS email_outbox(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, notification_id INTEGER, to_email TEXT,
+      subject TEXT, body TEXT, status TEXT DEFAULT 'pending', error TEXT,
+      created_at TEXT, sent_at TEXT)`);
   if (db.prepare("SELECT COUNT(*) c FROM support").get().c === 0) {
     const seeds = [
       ["SUP-204", "Meera Suresh", "Founder", "TiE membership verification",
@@ -440,6 +450,86 @@ async function require_super_admin(idToken) {
     return { error: "Only a super-admin can manage admin access.", status: 403 };
   }
   return { email: v.email };
+}
+
+// ---- Notifications & email outbox ----
+// Every important event is RECORDED here (a notification plus one email_outbox
+// row per recipient). Whether a recorded message is actually EMAILED depends on
+// MAIL_ENABLED, which is true only when a full SMTP configuration is present in
+// .env. Until then the platform runs in "record-only" mode: messages are
+// captured and shown on the admin Notifications screen, but nothing is sent.
+// This keeps the app safe to run before a mail provider is wired up.
+const SMTP_HOST = (ENV.SMTP_HOST || "").trim();
+const SMTP_PORT = parseInt((ENV.SMTP_PORT || "587").trim() || "587", 10);
+const SMTP_USER = (ENV.SMTP_USER || "").trim();
+const SMTP_PASS = (ENV.SMTP_PASS || "").trim();
+const MAIL_FROM = (ENV.MAIL_FROM || "").trim() || SMTP_USER;
+const MAIL_FROM_NAME = (ENV.MAIL_FROM_NAME || "VentureReady").trim();
+const MAIL_ENABLED = !!(SMTP_HOST && SMTP_USER && SMTP_PASS && MAIL_FROM);
+
+function _admin_emails() {
+  return db.prepare("SELECT email FROM admin_allowlist ORDER BY email ASC")
+    .all().map((r) => r.email);
+}
+
+function _expand_recipients(recipients) {
+  // Accept a list of email addresses and/or the token "admins" (= everyone on
+  // the allow-list). Returns a de-duplicated list with blanks removed.
+  const out = [];
+  (recipients || []).forEach((r) => {
+    r = (r || "").trim();
+    if (!r) return;
+    if (r.toLowerCase() === "admins") out.push(..._admin_emails());
+    else out.push(r);
+  });
+  const seen = new Set();
+  const uniq = [];
+  out.forEach((e) => {
+    const k = e.trim().toLowerCase();
+    if (k && !seen.has(k)) { seen.add(k); uniq.push(e); }
+  });
+  return uniq;
+}
+
+function notify(event, recipients, subject, body, urgency) {
+  // Record one notification + one pending email per recipient. Actual sending
+  // happens later (Stage 3) and only when MAIL_ENABLED; for now the rows simply
+  // wait in the outbox. Returns how many recipients were recorded.
+  urgency = urgency || "normal";
+  const insN = db.prepare(
+    "INSERT INTO notification(event, recipient, subject, body, urgency, created_at) " +
+    "VALUES(?,?,?,?,?,datetime('now'))");
+  const insO = db.prepare(
+    "INSERT INTO email_outbox(notification_id, to_email, subject, body, status, created_at) " +
+    "VALUES(?,?,?,?,'pending',datetime('now'))");
+  let n = 0;
+  _expand_recipients(recipients).forEach((to) => {
+    const info = insN.run(event, to, subject, body, urgency);
+    insO.run(info.lastInsertRowid, to, subject, body);
+    n += 1;
+  });
+  return n;
+}
+
+async function require_admin(idToken) {
+  // Any admin (super-admin OR regular) may view the notifications feed.
+  const v = await verify_google_token(idToken);
+  if (v.error) return { error: v.error, status: 401 };
+  const role = admin_role_for(v.email);
+  if (!role) return { error: "Admin access required.", status: 403 };
+  return { email: v.email, role: role };
+}
+
+function notifications_recent(limit) {
+  const rows = db.prepare(
+    "SELECT n.id, n.event, n.recipient, n.subject, n.body, n.urgency, n.created_at, " +
+    "o.status FROM notification n LEFT JOIN email_outbox o ON o.notification_id = n.id " +
+    "ORDER BY n.id DESC LIMIT ?").all(limit || 100);
+  return rows.map((r) => ({
+    id: r.id, event: r.event, recipient: r.recipient, subject: r.subject,
+    body: r.body, urgency: r.urgency || "normal", created_at: r.created_at || "",
+    status: r.status || "pending",
+  }));
 }
 
 const CHAPTER = "TiE Bangalore";
@@ -980,6 +1070,9 @@ async function handlePost(req, res, urlObj, data) {
     }
     db.prepare("INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) VALUES(?,?,datetime('now'))")
       .run(email, g.email);
+    notify("admin_added", [email, ...Array.from(ADMIN_SUPER_EMAILS).sort()],
+      "You have been added as a VentureReady admin",
+      g.email + " added " + email + " to the VentureReady Team Portal admin allow-list.", "normal");
     return sendJson(res, 200, { admins: admin_list() });
   } else if (p === "/api/admin/remove") {
     // Super-admin only: remove an admin email (a super-admin can't be removed).
@@ -990,7 +1083,15 @@ async function handlePost(req, res, urlObj, data) {
       return sendJson(res, 400, { error: "A super-admin can’t be removed." });
     }
     db.prepare("DELETE FROM admin_allowlist WHERE email=?").run(email);
+    notify("admin_removed", Array.from(ADMIN_SUPER_EMAILS).sort(),
+      "An admin was removed from VentureReady",
+      g.email + " removed " + email + " from the VentureReady Team Portal admin allow-list.", "normal");
     return sendJson(res, 200, { admins: admin_list() });
+  } else if (p === "/api/admin/notifications") {
+    // Any admin: view the recorded notifications feed / email outbox.
+    const g = await require_admin(data.credential || "");
+    if (g.error) return sendJson(res, g.status, { error: g.error });
+    return sendJson(res, 200, { notifications: notifications_recent(), mail_enabled: MAIL_ENABLED });
   } else if (p === "/api/review") {
     // A reviewer submits a verdict — this is what the founder then sees.
     const fid = data.founder_id;

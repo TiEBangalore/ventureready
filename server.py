@@ -83,6 +83,16 @@ def db_init():
     for _e in _admin_seed:
         conn.execute("INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) "
                      "VALUES(?,?,datetime('now'))", (_e, "seed"))
+    # Notifications: one row per important event, recorded even when email is off.
+    conn.execute("""CREATE TABLE IF NOT EXISTS notification(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, recipient TEXT,
+        subject TEXT, body TEXT, urgency TEXT, created_at TEXT)""")
+    # Email outbox: one row per recipient. status: 'pending' | 'sent' | 'failed'.
+    # In record-only mode (no SMTP configured) rows simply stay 'pending'.
+    conn.execute("""CREATE TABLE IF NOT EXISTS email_outbox(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, notification_id INTEGER, to_email TEXT,
+        subject TEXT, body TEXT, status TEXT DEFAULT 'pending', error TEXT,
+        created_at TEXT, sent_at TEXT)""")
     conn.commit()
     if conn.execute("SELECT COUNT(*) c FROM support").fetchone()["c"] == 0:
         seeds = [
@@ -437,6 +447,10 @@ def admin_add(id_token, email):
                  "VALUES(?,?,datetime('now'))", (email, g["email"]))
     conn.commit()
     conn.close()
+    notify("admin_added", [email] + sorted(ADMIN_SUPER_EMAILS),
+           "You have been added as a VentureReady admin",
+           g["email"] + " added " + email +
+           " to the VentureReady Team Portal admin allow-list.", "normal")
     return {"admins": admin_list()}
 
 def admin_remove(id_token, email):
@@ -450,7 +464,92 @@ def admin_remove(id_token, email):
     conn.execute("DELETE FROM admin_allowlist WHERE email=?", (email,))
     conn.commit()
     conn.close()
+    notify("admin_removed", sorted(ADMIN_SUPER_EMAILS),
+           "An admin was removed from VentureReady",
+           g["email"] + " removed " + email +
+           " from the VentureReady Team Portal admin allow-list.", "normal")
     return {"admins": admin_list()}
+
+# ---- Notifications & email outbox -----------------------------------------
+# Every important event is RECORDED here (a notification plus one email_outbox
+# row per recipient). Whether a recorded message is actually EMAILED depends on
+# MAIL_ENABLED, which is true only when a full SMTP configuration is present in
+# .env. Until then the platform runs in "record-only" mode: messages are
+# captured and shown on the admin Notifications screen, but nothing is sent.
+# This keeps the app safe to run before a mail provider is wired up.
+SMTP_HOST = ENV.get("SMTP_HOST", "").strip()
+SMTP_PORT = int((ENV.get("SMTP_PORT", "") or "587").strip() or "587")
+SMTP_USER = ENV.get("SMTP_USER", "").strip()
+SMTP_PASS = ENV.get("SMTP_PASS", "").strip()
+MAIL_FROM = ENV.get("MAIL_FROM", "").strip() or SMTP_USER
+MAIL_FROM_NAME = (ENV.get("MAIL_FROM_NAME", "") or "VentureReady").strip()
+MAIL_ENABLED = bool(SMTP_HOST and SMTP_USER and SMTP_PASS and MAIL_FROM)
+
+def _admin_emails():
+    conn = _db()
+    rows = conn.execute("SELECT email FROM admin_allowlist ORDER BY email ASC").fetchall()
+    conn.close()
+    return [r["email"] for r in rows]
+
+def _expand_recipients(recipients):
+    # Accept a list of email addresses and/or the token "admins" (= everyone on
+    # the allow-list). Returns a de-duplicated list with blanks removed.
+    out = []
+    for r in (recipients or []):
+        r = (r or "").strip()
+        if not r:
+            continue
+        if r.lower() == "admins":
+            out.extend(_admin_emails())
+        else:
+            out.append(r)
+    seen, uniq = set(), []
+    for e in out:
+        k = e.strip().lower()
+        if k and k not in seen:
+            seen.add(k)
+            uniq.append(e)
+    return uniq
+
+def notify(event, recipients, subject, body, urgency="normal"):
+    # Record one notification + one pending email per recipient. Actual sending
+    # happens later (Stage 3) and only when MAIL_ENABLED; for now the rows simply
+    # wait in the outbox. Returns how many recipients were recorded.
+    conn = _db()
+    n = 0
+    for to in _expand_recipients(recipients):
+        cur = conn.execute(
+            "INSERT INTO notification(event, recipient, subject, body, urgency, created_at) "
+            "VALUES(?,?,?,?,?,datetime('now'))", (event, to, subject, body, urgency))
+        conn.execute(
+            "INSERT INTO email_outbox(notification_id, to_email, subject, body, status, created_at) "
+            "VALUES(?,?,?,?,'pending',datetime('now'))", (cur.lastrowid, to, subject, body))
+        n += 1
+    conn.commit()
+    conn.close()
+    return n
+
+def require_admin(id_token):
+    # Any admin (super-admin OR regular) may view the notifications feed.
+    v = verify_google_token(id_token)
+    if v.get("error"):
+        return {"error": v["error"], "status": 401}
+    role = admin_role_for(v["email"])
+    if not role:
+        return {"error": "Admin access required.", "status": 403}
+    return {"email": v["email"], "role": role}
+
+def notifications_recent(limit=100):
+    conn = _db()
+    rows = conn.execute(
+        "SELECT n.id, n.event, n.recipient, n.subject, n.body, n.urgency, n.created_at, "
+        "o.status FROM notification n LEFT JOIN email_outbox o ON o.notification_id = n.id "
+        "ORDER BY n.id DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [{"id": r["id"], "event": r["event"], "recipient": r["recipient"],
+             "subject": r["subject"], "body": r["body"],
+             "urgency": r["urgency"] or "normal", "created_at": r["created_at"] or "",
+             "status": r["status"] or "pending"} for r in rows]
 
 CHAPTER = "TiE Bangalore"
 
@@ -961,6 +1060,14 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(out.get("status", 400), {"error": out["error"]})
                 else:
                     self._send(200, out)
+            elif self.path == "/api/admin/notifications":
+                # Any admin: view the recorded notifications feed / email outbox.
+                g = require_admin(data.get("credential", ""))
+                if g.get("error"):
+                    self._send(g["status"], {"error": g["error"]})
+                else:
+                    self._send(200, {"notifications": notifications_recent(),
+                                     "mail_enabled": MAIL_ENABLED})
             elif self.path == "/api/review":
                 # A reviewer submits a verdict — this is what the founder then sees.
                 fid = data.get("founder_id")

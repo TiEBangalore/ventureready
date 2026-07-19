@@ -3154,9 +3154,18 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div id="admin-notifications" class="admin-page">
       <div class="admin-page-hd">
         <h1>Notifications</h1>
-        <p>Everything that needs a TiE decision or a heads-up. Each item is emailed to the shared inbox <strong>admin.blr@tiebangalore.org</strong>. Newest first.</p>
+        <p>Everything that needs a TiE decision or a heads-up. Newest first. When email sending is switched on, each item is also emailed to the person concerned (and, for admin-wide alerts, the shared inbox <strong>admin.blr@tiebangalore.org</strong>).</p>
+      </div>
+      <div id="notif-mail-status" class="admin-card" style="margin-bottom:14px;display:none;"></div>
+      <div class="admin-card" id="notif-live-card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="font-size:13px;color:var(--dark);">Recorded notifications (live)</strong>
+          <button class="btn-xs" onclick="loadNotifications()">Refresh</button>
+        </div>
+        <div id="admin-notif-live"><div style="font-size:13px;color:var(--mid);padding:8px 0;">Loading…</div></div>
       </div>
       <div class="admin-card">
+        <div style="font-size:12px;color:var(--mid);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">Sample events (illustrative)</div>
         <div id="admin-notif-list">
           <div class="notif-item"><div class="notif-dot" style="background:#1D4ED8"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Investor application</strong> — Southbridge Capital applied for screened access.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2h ago · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('applications',document.querySelector('[onclick*=applications]'))">Open</button></div>
           <div class="notif-item"><div class="notif-dot" style="background:var(--green)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Verdict to countersign</strong> — Priya Nair (Ferra Health): reviewer recommends the mark.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">5h ago · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-green" onclick="showAdminPage('verdicts',document.querySelector('[onclick*=verdicts]'))">Open</button></div>
@@ -3708,6 +3717,7 @@ function showAdminPage(page, el){
   if(el) el.classList.add('active');
   if(page==='support' && typeof loadSupport==='function') loadSupport();
   if(page==='access' && typeof loadAdmins==='function') loadAdmins();
+  if(page==='notifications' && typeof loadNotifications==='function') loadNotifications();
 }
 function handleNdaContinue(){
   const isFree = document.getElementById('memberToggle').value === 'free';
@@ -4853,6 +4863,59 @@ async function removeAdmin(email){
     _renderAdmins(out.admins||[]);
     _adminAccessMsg('Removed '+email+'.', true);
   }catch(e){ _adminAccessMsg('Could not reach the server. Please try again.'); }
+}
+
+// ---- Live notifications feed (record-only until email is switched on) ----
+function _escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+async function loadNotifications(){
+  var live=document.getElementById('admin-notif-live');
+  var status=document.getElementById('notif-mail-status');
+  // The live feed needs a real Google admin sign-in (token per request).
+  if(!window.__adminCred){
+    if(status){ status.style.display='';
+      status.innerHTML='<div style="font-size:13px;color:var(--mid);">Sign in with a Google admin account to see the live recorded feed. (You are on the demo sign-in, so only the sample events below are shown.)</div>'; }
+    if(live) live.innerHTML='';
+    return;
+  }
+  if(live) live.innerHTML='<div style="font-size:13px;color:var(--mid);padding:8px 0;">Loading…</div>';
+  try{
+    var r=await fetch('/api/admin/notifications',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ if(live) live.innerHTML='<div style="font-size:13px;color:var(--red);padding:8px 0;">'+_escapeHtml(out.error)+'</div>'; return; }
+    _renderMailStatus(!!out.mail_enabled);
+    _renderNotifications(out.notifications||[]);
+  }catch(e){ if(live) live.innerHTML='<div style="font-size:13px;color:var(--red);padding:8px 0;">Could not reach the server. Please try again.</div>'; }
+}
+function _renderMailStatus(enabled){
+  var status=document.getElementById('notif-mail-status');
+  if(!status) return;
+  status.style.display='';
+  if(enabled){
+    status.innerHTML='<div style="font-size:13px;color:var(--dark);"><strong style="color:var(--green);">Email sending is ON.</strong> Recorded items below are being emailed to their recipients.</div>';
+  }else{
+    status.innerHTML='<div style="font-size:13px;color:var(--dark);"><strong style="color:#D97706;">Email sending is OFF (record-only).</strong> Events are being recorded below, but no email leaves the system yet. To switch sending on, a mail provider (SMTP) must be configured in the server settings.</div>';
+  }
+}
+function _renderNotifications(items){
+  var live=document.getElementById('admin-notif-live');
+  if(!live) return;
+  if(!items.length){
+    live.innerHTML='<div style="font-size:13px;color:var(--mid);padding:8px 0;">No notifications recorded yet. As founders, reviewers and admins act in the app, real events will appear here.</div>';
+    return;
+  }
+  var html='';
+  items.forEach(function(n){
+    var pending=(n.status!=='sent');
+    var dot = pending ? '#D97706' : 'var(--green)';
+    var statusTxt = pending ? 'recorded · not emailed' : 'emailed';
+    html+='<div class="notif-item"><div class="notif-dot" style="background:'+dot+'"></div>'+
+      '<div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>'+_escapeHtml(n.subject||n.event||'Notification')+'</strong></div>'+
+      '<div style="font-size:12px;color:var(--dark);margin-top:2px;">'+_escapeHtml(n.body||'')+'</div>'+
+      '<div style="font-size:11px;color:var(--mid);margin-top:3px;">to '+_escapeHtml(n.recipient||'')+' · '+_escapeHtml(n.created_at||'')+' · '+statusTxt+'</div></div></div>';
+  });
+  live.innerHTML=html;
 }
 
 // Founder demo fallback used only when NO Google Client ID is configured.
