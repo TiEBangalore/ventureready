@@ -70,14 +70,12 @@ def db_init():
     conn.execute("""CREATE TABLE IF NOT EXISTS dataroom_view(
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, doc_id INTEGER,
         item_key TEXT, viewer TEXT, viewed_at TEXT)""")
-    # Admin allow-list: who may enter the Team/Admin portal. The super-admin edits
+    # Admin allow-list: who may enter the Team/Admin portal. A super-admin edits
     # this from inside the portal, so this table is the LIVE source of truth. On
-    # first run it is seeded from ADMIN_SUPER_EMAIL + ADMIN_EMAILS (.env).
+    # first run it is seeded from the super-admins + ADMIN_EMAILS (.env).
     conn.execute("""CREATE TABLE IF NOT EXISTS admin_allowlist(
         email TEXT PRIMARY KEY, added_by TEXT, added_at TEXT)""")
-    _admin_seed = set()
-    if ADMIN_SUPER_EMAIL:
-        _admin_seed.add(ADMIN_SUPER_EMAIL)
+    _admin_seed = set(ADMIN_SUPER_EMAILS)
     for _e in ENV.get("ADMIN_EMAILS", "").split(","):
         _e = _e.strip().lower()
         if _e:
@@ -373,18 +371,30 @@ GOOGLE_CLIENT_ID = ENV.get("GOOGLE_CLIENT_ID", "")
 
 # ---- Admin / Team-Portal access allow-list ----
 # Only these Google-verified emails may enter the admin portal. Access is an
-# explicit allow-list (NOT the whole @tiebangalore.org domain). The primary
-# inbox admin.blr@tiebangalore.org is always included and is the SUPER-ADMIN.
+# explicit allow-list (NOT the whole @tiebangalore.org domain).
+#
+# SUPER-ADMINS are the trust anchor: they can add/remove admins and cannot be
+# removed in-app. Set them (comma-separated) via ADMIN_SUPER_EMAILS in .env;
+# default = the two TiE Bangalore owners.
 # ADMIN_EMAILS from .env is only a FIRST-RUN SEED. The live allow-list lives in
-# the admin_allowlist table (see db_init) so the super-admin can add/remove
+# the admin_allowlist table (see db_init) so a super-admin can add/remove
 # admins from inside the portal without editing files or restarting the server.
-ADMIN_SUPER_EMAIL = ENV.get("ADMIN_SUPER_EMAIL", "admin.blr@tiebangalore.org").strip().lower()
+_super_raw = ENV.get("ADMIN_SUPER_EMAILS") or ENV.get("ADMIN_SUPER_EMAIL") or \
+    "admin.blr@tiebangalore.org,chinmay@tiebangalore.org"
+ADMIN_SUPER_EMAILS = set()
+for _e in _super_raw.split(","):
+    _e = _e.strip().lower()
+    if _e:
+        ADMIN_SUPER_EMAILS.add(_e)
+
+def is_super_admin(email):
+    return (email or "").strip().lower() in ADMIN_SUPER_EMAILS
 
 def admin_role_for(email):
     email = (email or "").strip().lower()
     if not email:
         return None
-    if email == ADMIN_SUPER_EMAIL:
+    if is_super_admin(email):
         return "super-admin"
     conn = _db()
     row = conn.execute("SELECT email FROM admin_allowlist WHERE email=?", (email,)).fetchone()
@@ -392,26 +402,27 @@ def admin_role_for(email):
     return "admin" if row else None
 
 def admin_list():
-    # Super-admin always sorts to the top; everyone else alphabetically.
+    # Super-admins sort to the top; everyone else alphabetically.
     conn = _db()
     rows = conn.execute(
-        "SELECT email, added_by, added_at FROM admin_allowlist ORDER BY (email=?) DESC, email ASC",
-        (ADMIN_SUPER_EMAIL,)).fetchall()
+        "SELECT email, added_by, added_at FROM admin_allowlist ORDER BY email ASC").fetchall()
     conn.close()
-    return [{"email": r["email"],
-             "role": "super-admin" if r["email"] == ADMIN_SUPER_EMAIL else "admin",
+    mapped = [{"email": r["email"],
+             "role": "super-admin" if is_super_admin(r["email"]) else "admin",
              "added_by": r["added_by"] or "",
              "added_at": r["added_at"] or ""} for r in rows]
+    mapped.sort(key=lambda a: (0 if a["role"] == "super-admin" else 1, a["email"]))
+    return mapped
 
 def require_super_admin(id_token):
-    # Verify a Google credential and require it to be the SUPER-admin. Guards the
+    # Verify a Google credential and require it to be a SUPER-admin. Guards the
     # admin-management endpoints: there are no sessions yet, so the caller proves
     # who they are by sending their Google ID token with each request.
     v = verify_google_token(id_token)
     if v.get("error"):
         return {"error": v["error"], "status": 401}
-    if admin_role_for(v["email"]) != "super-admin":
-        return {"error": "Only the super-admin can manage admin access.", "status": 403}
+    if not is_super_admin(v["email"]):
+        return {"error": "Only a super-admin can manage admin access.", "status": 403}
     return {"email": v["email"]}
 
 def admin_add(id_token, email):
@@ -433,8 +444,8 @@ def admin_remove(id_token, email):
     if g.get("error"):
         return g
     email = (email or "").strip().lower()
-    if email == ADMIN_SUPER_EMAIL:
-        return {"error": "The super-admin can’t be removed.", "status": 400}
+    if is_super_admin(email):
+        return {"error": "A super-admin can’t be removed.", "status": 400}
     conn = _db()
     conn.execute("DELETE FROM admin_allowlist WHERE email=?", (email,))
     conn.commit()

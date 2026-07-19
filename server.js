@@ -91,11 +91,10 @@ function db_init() {
       item_key TEXT, viewer TEXT, viewed_at TEXT)`);
   // Admin allow-list: who may enter the Team/Admin portal. The super-admin edits
   // this from inside the portal, so this table is the LIVE source of truth. On
-  // first run it is seeded from ADMIN_SUPER_EMAIL + ADMIN_EMAILS (.env).
+  // first run it is seeded from the super-admins + ADMIN_EMAILS (.env).
   db.exec(`CREATE TABLE IF NOT EXISTS admin_allowlist(
       email TEXT PRIMARY KEY, added_by TEXT, added_at TEXT)`);
-  const _adminSeed = new Set();
-  if (ADMIN_SUPER_EMAIL) _adminSeed.add(ADMIN_SUPER_EMAIL);
+  const _adminSeed = new Set(ADMIN_SUPER_EMAILS);
   (ENV.ADMIN_EMAILS || "").split(",").forEach((e) => {
     e = (e || "").trim().toLowerCase();
     if (e) _adminSeed.add(e);
@@ -388,41 +387,57 @@ const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID || "";
 
 // ---- Admin / Team-Portal access allow-list ----
 // Only these Google-verified emails may enter the admin portal. Access is an
-// explicit allow-list (NOT the whole @tiebangalore.org domain). The primary
-// inbox admin.blr@tiebangalore.org is always included and is the SUPER-ADMIN.
-// Add more admins via ADMIN_EMAILS (comma-separated) in .env; override the
-// super-admin via ADMIN_SUPER_EMAIL if ever needed.
-const ADMIN_SUPER_EMAIL = (ENV.ADMIN_SUPER_EMAIL || "admin.blr@tiebangalore.org").trim().toLowerCase();
+// explicit allow-list (NOT the whole @tiebangalore.org domain).
+//
+// SUPER-ADMINS are the trust anchor: they can add/remove admins and cannot be
+// removed in-app. Set them (comma-separated) via ADMIN_SUPER_EMAILS in .env;
+// default = the two TiE Bangalore owners.
+const ADMIN_SUPER_EMAILS = (function () {
+  const raw = ENV.ADMIN_SUPER_EMAILS || ENV.ADMIN_SUPER_EMAIL ||
+    "admin.blr@tiebangalore.org,chinmay@tiebangalore.org";
+  const set = new Set();
+  raw.split(",").forEach((e) => { e = (e || "").trim().toLowerCase(); if (e) set.add(e); });
+  return set;
+})();
+function is_super_admin(email) {
+  return ADMIN_SUPER_EMAILS.has((email || "").trim().toLowerCase());
+}
 // ADMIN_EMAILS from .env is only a FIRST-RUN SEED. The live allow-list lives in
-// the admin_allowlist table (see db_init) so the super-admin can add/remove
+// the admin_allowlist table (see db_init) so a super-admin can add/remove
 // admins from inside the portal without editing files or restarting the server.
 function admin_role_for(email) {
   email = (email || "").trim().toLowerCase();
   if (!email) return null;
-  if (email === ADMIN_SUPER_EMAIL) return "super-admin";
+  if (is_super_admin(email)) return "super-admin";
   const row = db.prepare("SELECT email FROM admin_allowlist WHERE email=?").get(email);
   return row ? "admin" : null;
 }
 function admin_list() {
-  // Super-admin always sorts to the top; everyone else alphabetically.
+  // Super-admins sort to the top; everyone else alphabetically.
   const rows = db.prepare(
-    "SELECT email, added_by, added_at FROM admin_allowlist ORDER BY (email=?) DESC, email ASC"
-  ).all(ADMIN_SUPER_EMAIL);
-  return rows.map((r) => ({
+    "SELECT email, added_by, added_at FROM admin_allowlist ORDER BY email ASC"
+  ).all();
+  const mapped = rows.map((r) => ({
     email: r.email,
-    role: r.email === ADMIN_SUPER_EMAIL ? "super-admin" : "admin",
+    role: is_super_admin(r.email) ? "super-admin" : "admin",
     added_by: r.added_by || "",
     added_at: r.added_at || "",
   }));
+  mapped.sort((a, b) => {
+    const sa = a.role === "super-admin" ? 0 : 1;
+    const sb = b.role === "super-admin" ? 0 : 1;
+    return sa - sb || a.email.localeCompare(b.email);
+  });
+  return mapped;
 }
-// Verify a Google credential and require it to be the SUPER-admin. This guards
-// the admin-management endpoints: there are no browser sessions yet, so the
-// caller proves who they are by sending their Google ID token with each request.
+// Verify a Google credential and require it to be a SUPER-admin. This guards the
+// admin-management endpoints: there are no browser sessions yet, so the caller
+// proves who they are by sending their Google ID token with each request.
 async function require_super_admin(idToken) {
   const v = await verify_google_token(idToken);
   if (v.error) return { error: v.error, status: 401 };
-  if (admin_role_for(v.email) !== "super-admin") {
-    return { error: "Only the super-admin can manage admin access.", status: 403 };
+  if (!is_super_admin(v.email)) {
+    return { error: "Only a super-admin can manage admin access.", status: 403 };
   }
   return { email: v.email };
 }
@@ -967,12 +982,12 @@ async function handlePost(req, res, urlObj, data) {
       .run(email, g.email);
     return sendJson(res, 200, { admins: admin_list() });
   } else if (p === "/api/admin/remove") {
-    // Super-admin only: remove an admin email (the super-admin can't be removed).
+    // Super-admin only: remove an admin email (a super-admin can't be removed).
     const g = await require_super_admin(data.credential || "");
     if (g.error) return sendJson(res, g.status, { error: g.error });
     const email = (data.email || "").trim().toLowerCase();
-    if (email === ADMIN_SUPER_EMAIL) {
-      return sendJson(res, 400, { error: "The super-admin can’t be removed." });
+    if (is_super_admin(email)) {
+      return sendJson(res, 400, { error: "A super-admin can’t be removed." });
     }
     db.prepare("DELETE FROM admin_allowlist WHERE email=?").run(email);
     return sendJson(res, 200, { admins: admin_list() });
