@@ -1118,9 +1118,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         </div>
       </div>
       <div style="padding:20px 28px;background:var(--surface);border-top:1px solid var(--border);">
-        <!-- Existing member bypass — LIVE check against TiE Bangalore's Zoho records -->
-        <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:14px 16px;margin-bottom:16px;">
-          <div style="font-size:13px;color:var(--dark);margin-bottom:10px;">Already a <strong>TiE Bangalore member</strong>? Verify to continue free — checked live against TiE's membership records.</div>
+        <!-- Existing member bypass — LIVE check against TiE Bangalore's Zoho records.
+             If the person is already signed in as a confirmed member, _applyFounder()
+             turns this into a "you're already verified" confirmation instead. -->
+        <div id="member-gate" style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+          <div id="member-gate-msg" style="font-size:13px;color:var(--dark);margin-bottom:10px;">Already a <strong>TiE Bangalore member</strong>? Verify to continue free — checked live against TiE's membership records.</div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <input id="member-email" type="email" placeholder="you@yourcompany.com" style="flex:1;min-width:220px;padding:10px 14px;border:1px solid var(--green-border);border-radius:6px;font-size:14px;" onkeydown="if(event.key==='Enter')verifyMember()">
             <button class="btn btn-dark" id="member-verify-btn" onclick="verifyMember()" style="flex-shrink:0;white-space:nowrap;">Verify my TiE membership</button>
@@ -4528,10 +4530,46 @@ function _applyFounder(rec){
     mem += ' ⚠ couldn’t reach TiE records just now — showing last confirmed status'+(when?(' ('+when+')'):'');
   }
   PROFILES.founder.rows.push(['TiE membership', mem]);
+  // The AI-reading screen has an "Already a TiE member? Verify to continue" box.
+  // Now that sign-in already confirms membership, reflect that here instead of
+  // asking the person to verify a second time.
+  _reflectMembershipGate(rec);
   // Bring back their last saved AI read so it survives a refresh.
   if(rec.latest_diagnostic){
     window._lastDiag = rec.latest_diagnostic;
     window._freeStep = window._freeStep || { icp:'', pitch:'', filename: rec.latest_diagnostic.filename||'' };
+  }
+}
+
+// Turn the "verify your TiE membership" box on the AI-reading screen into an
+// "already verified" confirmation when the signed-in founder is a confirmed
+// member. If they are NOT a confirmed member, the box stays as the live check.
+function _reflectMembershipGate(rec){
+  var box=document.getElementById('member-gate');
+  var msg=document.getElementById('member-gate-msg');
+  var input=document.getElementById('member-email');
+  var vbtn=document.getElementById('member-verify-btn');
+  var cont=document.getElementById('member-continue');
+  var result=document.getElementById('member-result');
+  if(!box||!msg) return;
+  if(rec && rec.is_member){
+    // Already a confirmed member — skip the second check, let them continue free.
+    var cat=rec.membership_category?(' · '+rec.membership_category):'';
+    var stale=rec.membership_stale
+      ? ' <span style="color:#b45309;">(showing last confirmed status — couldn’t re-reach TiE just now)</span>'
+      : '';
+    msg.innerHTML='✓ Signed in as an <strong>active TiE Bangalore member</strong>'+cat+
+      ' — your membership was verified at sign-in, so you can continue free.'+stale;
+    if(input) input.style.display='none';
+    if(vbtn) vbtn.style.display='none';
+    if(result){ result.style.display='none'; }
+    if(cont) cont.style.display='';        // show "Continue as Member →"
+  } else {
+    // Not a confirmed member (or signed out) — keep the live verify option.
+    msg.innerHTML='Already a <strong>TiE Bangalore member</strong>? Verify to continue free — checked live against TiE’s membership records.';
+    if(input) input.style.display='';
+    if(vbtn) vbtn.style.display='';
+    if(cont) cont.style.display='none';
   }
 }
 
