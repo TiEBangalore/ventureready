@@ -1,0 +1,21 @@
+{
+  "name": "ventureready",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TiE Bangalore VentureReady prototype — Node.js backend (port of server.py).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  },
+  "optionalDependencies": {
+    "pdf-parse": "^1.1.1",
+    "adm-zip": "^0.5.16",
+    "sharp": "^0.33.5"
+  }
+}

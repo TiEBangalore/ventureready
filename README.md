@@ -5,23 +5,31 @@ AI positioning diagnostic, submit their deck for expert review, and — once the
 earn the **VentureReady** mark — become visible to screened investors.
 
 - **Frontend:** a single file, [`index.html`](index.html) (HTML + CSS + vanilla JS).
-- **Backend:** [`server.py`](server.py) — Python standard library only
-  (`http.server` + `sqlite3`). **No pip packages required to run it.**
+- **Backend:** [`server.js`](server.js) — Node.js. Uses Node's built-in `http`
+  and `crypto`, plus `better-sqlite3` for the database (and optional
+  `pdf-parse` / `adm-zip` / `sharp` for reading uploaded decks).
 - **Database:** SQLite (`data.db`), created automatically on first run.
+
+> The original Python backend [`server.py`](server.py) is kept in the repo for
+> reference. `server.js` is a 1:1 behavioural port — same routes, same JSON, same
+> database and the **same password hashing**, so the existing `data.db` keeps
+> working unchanged. New work should happen in `server.js`.
 
 ## Running it locally
 
-Requires Python 3 (already on macOS / most Linux).
+Requires **Node.js 18 or newer** (`node --version` to check).
 
 ```bash
 cd Code
 cp .env.example .env      # then fill in the real keys — see below
-python3 server.py
+npm install               # first time only — installs the dependencies
+npm start                 # (or: node server.js)
 ```
 
 Then open **http://localhost:8000** in a browser.
 
-On macOS you can also just double-click **`Start VentureReady.command`**.
+On macOS you can also just double-click **`Start VentureReady.command`** — it
+runs `npm install` automatically the first time.
 
 ## Configuration (`.env`)
 
@@ -43,6 +51,7 @@ are recreated locally at runtime:
 - `.env`, `secrets/` — API keys and credentials
 - `data.db` — the live database (real founder records + password hashes)
 - `decks/`, `dataroom/` — founders' uploaded pitch decks and diligence documents
+- `node_modules/` — installed dependencies (recreated by `npm install`)
 
 ## Roles
 
