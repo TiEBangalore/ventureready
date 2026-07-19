@@ -42,8 +42,8 @@ git-ignored and must never be committed.
 | `GOOGLE_CLIENT_ID` | "Continue with Google" sign-in (public OAuth Client ID from Google Cloud Console). Add your app's URL as an Authorized JavaScript origin. | Google button falls back to the demo sign-in |
 | `ANTHROPIC_API_KEY` | Live AI positioning diagnostic (Claude) | Falls back to a canned sample result |
 | `ANTHROPIC_MODEL` | Optional — pin a specific Claude model | Uses the default model |
-| `ADMIN_EMAILS` | Extra admin emails allowed into the Team Portal (comma-separated). `admin.blr@tiebangalore.org` is always allowed and is the super-admin. | Only the super-admin can sign in |
-| `ADMIN_SUPER_EMAIL` | Optional — change who the super-admin is | Defaults to `admin.blr@tiebangalore.org` |
+| `ADMIN_EMAILS` | First-run **seed** of extra admin emails for the Team Portal (comma-separated). After first run the list is managed in-app by a super-admin. | Only the super-admins can sign in |
+| `ADMIN_SUPER_EMAILS` | Super-admins (comma-separated) who can add/remove admins in-app and can't be removed | Defaults to `admin.blr@tiebangalore.org,chinmay@tiebangalore.org` |
 
 ## What's in the repo (and what isn't)
 
