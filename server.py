@@ -354,6 +354,32 @@ ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY", "")
 # client secret here: the browser gets a signed ID token and the server only
 # verifies it, so no secret is needed. Blank = feature off (button falls back to demo).
 GOOGLE_CLIENT_ID = ENV.get("GOOGLE_CLIENT_ID", "")
+
+# ---- Admin / Team-Portal access allow-list ----
+# Only these Google-verified emails may enter the admin portal. Access is an
+# explicit allow-list (NOT the whole @tiebangalore.org domain). The primary
+# inbox admin.blr@tiebangalore.org is always included and is the SUPER-ADMIN.
+# Add more admins via ADMIN_EMAILS (comma-separated) in .env; override the
+# super-admin via ADMIN_SUPER_EMAIL if ever needed.
+ADMIN_SUPER_EMAIL = ENV.get("ADMIN_SUPER_EMAIL", "admin.blr@tiebangalore.org").strip().lower()
+ADMIN_EMAILS = set()
+if ADMIN_SUPER_EMAIL:
+    ADMIN_EMAILS.add(ADMIN_SUPER_EMAIL)
+for _e in ENV.get("ADMIN_EMAILS", "").split(","):
+    _e = _e.strip().lower()
+    if _e:
+        ADMIN_EMAILS.add(_e)
+
+def admin_role_for(email):
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    if email == ADMIN_SUPER_EMAIL:
+        return "super-admin"
+    if email in ADMIN_EMAILS:
+        return "admin"
+    return None
+
 CHAPTER = "TiE Bangalore"
 
 # ---- Zoho token cache (token lives 1 hour) ----
@@ -527,7 +553,9 @@ def founder_google_login(id_token):
         conn = _db()
         refreshed = conn.execute("SELECT * FROM founder WHERE id=?", (fid,)).fetchone()
         conn.close()
-    return {"founder": _public_founder(refreshed)}
+    # Decide the role from the admin allow-list. Everyone else is a "founder".
+    role = admin_role_for(v["email"]) or "founder"
+    return {"founder": _public_founder(refreshed), "role": role}
 
 # ---- Deck text extraction (reads the founder's actual uploaded deck) ----
 # How many slide pictures we'll send the AI, and how big each may be.

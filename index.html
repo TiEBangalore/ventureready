@@ -2939,15 +2939,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="font-size:13px;font-weight:700;color:var(--dark);">VentureReady · Team Portal</div>
         <div style="font-size:12px;color:var(--grey);margin-top:2px;">TiE Bangalore admin access only</div>
       </div>
-      <div class="form-group">
-        <label>TiE email address</label>
-        <input type="email" placeholder="you@tiebangalore.org" />
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" placeholder="••••••••" />
-      </div>
-      <button class="btn btn-dark btn-full" onclick="loggedInAs='admin';goAdmin('dashboard')" style="margin-top:4px;">Sign In to Admin →</button>
+      <div id="gsi-admin-button" style="display:none;margin-bottom:12px;"></div>
+      <button id="admin-google-fallback-btn" class="btn btn-dark btn-full" onclick="adminDemoSignIn()" style="margin-top:4px;">Sign In to Admin (demo) →</button>
+      <div id="admin-login-error" style="display:none;color:var(--red);font-size:12px;margin-top:10px;"></div>
+      <div style="font-size:11px;color:var(--grey);margin-top:14px;line-height:1.55;">Access is restricted to approved TiE Bangalore admins. Sign in with your <strong>@tiebangalore.org</strong> Google account. Not on the list? Email <strong>admin.blr@tiebangalore.org</strong>.</div>
       <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--mid);">
         <a onclick="go('home')" style="cursor:pointer;color:var(--mid);">← Back to VentureReady</a>
       </div>
@@ -2986,7 +2981,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div id="adminAvatar" style="width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;">RS</div>
         <div style="flex:1;">
           <div id="adminName" style="font-size:12px;font-weight:700;color:rgba(255,255,255,.85);">Ritu Sharma</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.35);">TiE Bangalore</div>
+          <div id="adminRoleLine" style="font-size:10px;color:rgba(255,255,255,.35);">TiE Bangalore</div>
         </div>
         <button onclick="toggleAdminUser()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px;cursor:pointer;">Switch</button>
       </div>
@@ -3157,16 +3152,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div id="admin-notifications" class="admin-page">
       <div class="admin-page-hd">
         <h1>Notifications</h1>
-        <p>Everything that needs a TiE decision or a heads-up. Each item is emailed to the shared inbox <strong>admin@tiebangalore.org</strong>. Newest first.</p>
+        <p>Everything that needs a TiE decision or a heads-up. Each item is emailed to the shared inbox <strong>admin.blr@tiebangalore.org</strong>. Newest first.</p>
       </div>
       <div class="admin-card">
         <div id="admin-notif-list">
-          <div class="notif-item"><div class="notif-dot" style="background:#1D4ED8"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Investor application</strong> — Southbridge Capital applied for screened access.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2h ago · emailed to admin@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('applications',document.querySelector('[onclick*=applications]'))">Open</button></div>
-          <div class="notif-item"><div class="notif-dot" style="background:var(--green)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Verdict to countersign</strong> — Priya Nair (Ferra Health): reviewer recommends the mark.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">5h ago · emailed to admin@tiebangalore.org</div></div><button class="btn-xs btn-xs-green" onclick="showAdminPage('verdicts',document.querySelector('[onclick*=verdicts]'))">Open</button></div>
-          <div class="notif-item"><div class="notif-dot" style="background:#D97706"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Meeting request</strong> — Rajan Kumar → Stackr intro awaiting facilitation.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">Yesterday · emailed to admin@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('meetings',document.querySelector('[onclick*=meetings]'))">Open</button></div>
-          <div class="notif-item"><div class="notif-dot" style="background:var(--red)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Payment failed</strong> — Rohan Verma's ₹10,000 + GST membership payment did not go through.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">Yesterday · emailed to admin@tiebangalore.org</div></div></div>
-          <div class="notif-item"><div class="notif-dot" style="background:var(--red)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Membership check failed</strong> — a founder's email wasn't found in Zoho and is stuck at the gate.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2 days ago · emailed to admin@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('support',document.querySelector('[onclick*=support]'))">Open</button></div>
-          <div class="notif-item"><div class="notif-dot" style="background:var(--red)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Review SLA breached</strong> — Stackr expert review unassigned for 7 days.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2 days ago · emailed to admin@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('reviews',document.querySelector('[onclick*=reviews]'))">Open</button></div>
+          <div class="notif-item"><div class="notif-dot" style="background:#1D4ED8"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Investor application</strong> — Southbridge Capital applied for screened access.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2h ago · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('applications',document.querySelector('[onclick*=applications]'))">Open</button></div>
+          <div class="notif-item"><div class="notif-dot" style="background:var(--green)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Verdict to countersign</strong> — Priya Nair (Ferra Health): reviewer recommends the mark.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">5h ago · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-green" onclick="showAdminPage('verdicts',document.querySelector('[onclick*=verdicts]'))">Open</button></div>
+          <div class="notif-item"><div class="notif-dot" style="background:#D97706"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Meeting request</strong> — Rajan Kumar → Stackr intro awaiting facilitation.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">Yesterday · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('meetings',document.querySelector('[onclick*=meetings]'))">Open</button></div>
+          <div class="notif-item"><div class="notif-dot" style="background:var(--red)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Payment failed</strong> — Rohan Verma's ₹10,000 + GST membership payment did not go through.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">Yesterday · emailed to admin.blr@tiebangalore.org</div></div></div>
+          <div class="notif-item"><div class="notif-dot" style="background:var(--red)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Membership check failed</strong> — a founder's email wasn't found in Zoho and is stuck at the gate.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2 days ago · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('support',document.querySelector('[onclick*=support]'))">Open</button></div>
+          <div class="notif-item"><div class="notif-dot" style="background:var(--red)"></div><div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>Review SLA breached</strong> — Stackr expert review unassigned for 7 days.</div><div style="font-size:11px;color:var(--mid);margin-top:2px;">2 days ago · emailed to admin.blr@tiebangalore.org</div></div><button class="btn-xs btn-xs-red" onclick="showAdminPage('reviews',document.querySelector('[onclick*=reviews]'))">Open</button></div>
         </div>
       </div>
     </div>
@@ -3175,7 +3170,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div id="admin-support" class="admin-page">
       <div class="admin-page-hd">
         <h1>Support Requests</h1>
-        <p>In-app help requests from founders, reviewers and investors. Replies go by email from <strong>admin@tiebangalore.org</strong>. Formal complaints are handled separately in the Complaint Log.</p>
+        <p>In-app help requests from founders, reviewers and investors. Replies go by email from <strong>admin.blr@tiebangalore.org</strong>. Formal complaints are handled separately in the Complaint Log.</p>
       </div>
       <div class="admin-card">
         <table class="admin-table">
@@ -3228,7 +3223,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 </div><!-- end screen-admin -->
 
 <!-- ══════════════════════════
-     SUPPORT / GET HELP  (any role → admin@tiebangalore.org)
+     SUPPORT / GET HELP  (any role → admin.blr@tiebangalore.org)
 ══════════════════════════ -->
 <style>
   .nav-count{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;}
@@ -3241,7 +3236,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div style="background:var(--charcoal);color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="width:30px;height:30px;border-radius:8px;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:15px;">🎧</span>
-        <div><div style="font-size:15px;font-weight:800;">Contact TiE Support</div><div style="font-size:11px;color:rgba(255,255,255,.55);">Goes to admin@tiebangalore.org</div></div>
+        <div><div style="font-size:15px;font-weight:800;">Contact TiE Support</div><div style="font-size:11px;color:rgba(255,255,255,.55);">Goes to admin.blr@tiebangalore.org</div></div>
       </div>
       <span onclick="closeSupport()" style="cursor:pointer;font-size:22px;color:rgba(255,255,255,.6);line-height:1;">&times;</span>
     </div>
@@ -3298,7 +3293,7 @@ function submitSupport(){
   function done(ref){
     addNotification('Support request', fromName+' — '+cat+': '+subj, 'support');
     document.getElementById('support-confirm-text').innerHTML =
-      'Your request (<strong>#'+ref+'</strong>) is <strong>saved</strong> and on its way to <strong>admin@tiebangalore.org</strong>. The TiE team will reply by email, usually within one business day.';
+      'Your request (<strong>#'+ref+'</strong>) is <strong>saved</strong> and on its way to <strong>admin.blr@tiebangalore.org</strong>. The TiE team will reply by email, usually within one business day.';
     document.getElementById('support-form').style.display='none';
     document.getElementById('support-confirm').style.display='';
   }
@@ -3334,7 +3329,7 @@ function addNotification(type, detail, page){
   var item=document.createElement('div'); item.className='notif-item';
   item.innerHTML='<div class="notif-dot" style="background:var(--red)"></div>'
     +'<div style="flex:1;"><div style="font-size:13px;color:var(--dark);"><strong>'+_esc(type)+'</strong> — '+_esc(detail)+'</div>'
-    +'<div style="font-size:11px;color:var(--mid);margin-top:2px;">Just now · emailed to admin@tiebangalore.org</div></div>';
+    +'<div style="font-size:11px;color:var(--mid);margin-top:2px;">Just now · emailed to admin.blr@tiebangalore.org</div></div>';
   if(page){
     var b=document.createElement('button'); b.className='btn-xs btn-xs-red'; b.textContent='Open';
     b.onclick=function(){ showAdminPage(page, document.querySelector('.admin-nav-item[onclick*="'+page+'"]')); };
@@ -4681,6 +4676,15 @@ async function initGoogleSignIn(){
         host.style.display='';
         google.accounts.id.renderButton(host, { theme:'outline', size:'large', width:320, text:'continue_with' });
       }
+      // The admin/Team Portal login uses the SAME Google sign-in. The server
+      // decides — from its allow-list — whether the verified email is an admin.
+      var ahost=document.getElementById('gsi-admin-button');
+      var afb=document.getElementById('admin-google-fallback-btn');
+      if(afb) afb.style.display='none';
+      if(ahost){
+        ahost.style.display='';
+        google.accounts.id.renderButton(ahost, { theme:'filled_black', size:'large', width:320, text:'signin_with' });
+      }
     }catch(e){}
   };
   document.head.appendChild(s);
@@ -4688,24 +4692,64 @@ async function initGoogleSignIn(){
 window.addEventListener('load', initGoogleSignIn);
 
 // Called by Google once the person has signed in — response.credential is the ID token.
+// The SAME callback serves both the founder login and the admin/Team-Portal login.
+// Which screen the person is on decides where they land; the SERVER decides (from
+// its allow-list) whether the verified email is allowed into the admin portal.
 async function handleGoogleCredential(response){
-  _authErr('li-error','');
+  var onAdmin = document.getElementById('screen-admin-login').classList.contains('active');
+  var errId = onAdmin ? 'admin-login-error' : 'li-error';
+  _authErr(errId,'');
   try{
     var r=await fetch('/api/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({credential:(response&&response.credential)||''})});
     var out=await r.json();
-    if(out.error){ _authErr('li-error', out.error); return; }
+    if(out.error){ _authErr(errId, out.error); return; }
+    var isAdmin = (out.role==='admin' || out.role==='super-admin');
+    if(onAdmin){
+      // Admin/Team-Portal login: only allow-listed emails may enter.
+      if(!isAdmin){
+        _authErr(errId, 'This Google account isn’t on the VentureReady admin allow-list. To request access, email admin.blr@tiebangalore.org.');
+        return;
+      }
+      _applyAdmin(out);
+      return;
+    }
+    // Founder login screen → the founder app (even if this email is also an admin).
     _applyFounder(out.founder);
-  }catch(e){ _authErr('li-error','Could not reach the server. Please try again.'); return; }
-  loggedInAs='founder'; go('upload');
+    loggedInAs='founder'; go('upload');
+  }catch(e){ _authErr(errId,'Could not reach the server. Please try again.'); return; }
 }
 
-// Fallback used only when NO Google Client ID is configured (demo/offline).
+// Put an allow-listed admin into the Team Portal, showing their real name + role.
+function _applyAdmin(out){
+  try{
+    var f = out.founder || {};
+    var nm = (f.name || '').trim() || 'TiE Admin';
+    var em = (f.email || '').trim();
+    var nameEl=document.getElementById('adminName'); if(nameEl) nameEl.textContent=nm;
+    var roleEl=document.getElementById('adminRoleLine');
+    if(roleEl) roleEl.textContent = (out.role==='super-admin' ? 'Super Admin · ' : 'Admin · ') + 'TiE Bangalore';
+    var avEl=document.getElementById('adminAvatar');
+    if(avEl){
+      var parts=nm.split(/\s+/);
+      var initials=((parts[0]||'')[0]||'')+((parts[1]||'')[0]||'');
+      avEl.textContent=(initials||em[0]||'A').toUpperCase();
+    }
+  }catch(e){}
+  loggedInAs='admin'; goAdmin('dashboard');
+}
+
+// Founder demo fallback used only when NO Google Client ID is configured.
 // Routes through demoFounder() so the demo sign-in creates a REAL saved founder
 // record (decks + diagnostics then have an owner to attach to).
 function googleSignIn(){
   alert('Google sign-in (demo)\n\nSigned in as Rohan Verma <rohan@stackr.io>.\n\nThis is the demo fallback. Set GOOGLE_CLIENT_ID in the server\'s .env to enable real Google sign-in — Google verifies identity, then the TiE membership check runs, then you\'re routed to the right dashboard.');
   demoFounder();
+}
+
+// Admin demo fallback used only when NO Google Client ID is configured.
+function adminDemoSignIn(){
+  loggedInAs='admin'; goAdmin('dashboard');
 }
 
 

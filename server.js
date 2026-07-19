@@ -371,6 +371,31 @@ const ANTHROPIC_API_KEY = ENV.ANTHROPIC_API_KEY || "";
 // only verifies it, so no secret is needed for this flow. Blank = feature off
 // (the button falls back to the demo sign-in).
 const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID || "";
+
+// ---- Admin / Team-Portal access allow-list ----
+// Only these Google-verified emails may enter the admin portal. Access is an
+// explicit allow-list (NOT the whole @tiebangalore.org domain). The primary
+// inbox admin.blr@tiebangalore.org is always included and is the SUPER-ADMIN.
+// Add more admins via ADMIN_EMAILS (comma-separated) in .env; override the
+// super-admin via ADMIN_SUPER_EMAIL if ever needed.
+const ADMIN_SUPER_EMAIL = (ENV.ADMIN_SUPER_EMAIL || "admin.blr@tiebangalore.org").trim().toLowerCase();
+const ADMIN_EMAILS = (function () {
+  const set = new Set();
+  if (ADMIN_SUPER_EMAIL) set.add(ADMIN_SUPER_EMAIL);
+  (ENV.ADMIN_EMAILS || "").split(",").forEach(function (e) {
+    e = (e || "").trim().toLowerCase();
+    if (e) set.add(e);
+  });
+  return set;
+})();
+function admin_role_for(email) {
+  email = (email || "").trim().toLowerCase();
+  if (!email) return null;
+  if (email === ADMIN_SUPER_EMAIL) return "super-admin";
+  if (ADMIN_EMAILS.has(email)) return "admin";
+  return null;
+}
+
 const CHAPTER = "TiE Bangalore";
 
 // ---- Zoho token cache (token lives 1 hour) ----
@@ -537,7 +562,9 @@ async function founder_google_login(idToken) {
   const fid = founder_google_upsert(v.sub, v.email, v.name);
   const refreshed = await refresh_membership(fid);
   const row = refreshed || db.prepare("SELECT * FROM founder WHERE id=?").get(fid);
-  return { founder: public_founder(row) };
+  // Decide the role from the admin allow-list. Everyone else is a "founder".
+  const role = admin_role_for(v.email) || "founder";
+  return { founder: public_founder(row), role: role };
 }
 
 // ---- Deck text extraction (reads the founder's actual uploaded deck) ----
