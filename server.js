@@ -137,7 +137,12 @@ function support_add(d) {
   const rid = Number(cur.lastInsertRowid);
   const ref = "SUP-" + (204 + rid);
   db.prepare("UPDATE support SET ref=? WHERE id=?").run(ref, rid);
-  return db.prepare("SELECT * FROM support WHERE id=?").get(rid);
+  const row = db.prepare("SELECT * FROM support WHERE id=?").get(rid);
+  notify("support_request", ["admins"],
+    "New support request: " + (d.subject || "(no subject)"),
+    (d.from_name || "Someone") + " (" + (d.role || "user") +
+    ") submitted a support request. " + (d.message || ""), "normal");
+  return row;
 }
 
 function support_list() {
@@ -205,7 +210,13 @@ async function founder_signup(d) {
   // Check TiE membership with Zoho as part of signing up, so the new profile
   // already shows the correct member status.
   const refreshed = await refresh_membership(fid);
-  return { founder: public_founder(refreshed || row) };
+  const pub = public_founder(refreshed || row) || {};
+  notify("founder_welcome", [email],
+    "Welcome to VentureReady",
+    "Thanks for creating your VentureReady account, " + (pub.name || "founder") +
+    ". You can now run the free positioning diagnostic and submit your deck for expert review.",
+    "normal");
+  return { founder: pub };
 }
 
 async function founder_login(email, password) {
@@ -271,6 +282,11 @@ function deck_add(founder_id, filename, raw) {
   fs.writeFileSync(path.join(DECKS_DIR, stored), raw);
   const cur = db.prepare("INSERT INTO deck(founder_id,filename,stored_path,size,uploaded_at) " +
     "VALUES(?,?,?,?,datetime('now'))").run(founder_id, filename, stored, raw.length);
+  const fb = _founder_brief(founder_id);
+  notify("deck_submitted", ["admins"],
+    "New deck submitted for review",
+    (fb.name || "A founder") + (fb.company ? (" (" + fb.company + ")") : "") +
+    " uploaded a pitch deck: " + (filename || "deck") + ".", "normal");
   return Number(cur.lastInsertRowid);
 }
 
@@ -285,6 +301,31 @@ function review_add(founder_id, verdict, gaps, reviewer, note) {
   db.prepare("INSERT INTO review(founder_id,round,verdict,gaps_json,reviewer,note,created_at) " +
     "VALUES(?,?,?,?,?,?,datetime('now'))").run(
     founder_id, rnd, verdict, JSON.stringify(gaps || []), reviewer || "TiE Reviewer", note || "");
+  const fb = _founder_brief(founder_id);
+  if (verdict === "awarded") {
+    if (fb.email) {
+      notify("mark_awarded", [fb.email],
+        "You have earned the VentureReady mark",
+        "Congratulations " + (fb.name || "") +
+        " — your venture has been awarded the VentureReady mark. Screened investors can now discover your profile.",
+        "high");
+    }
+    notify("mark_awarded_admin", ["admins"],
+      "VentureReady mark awarded",
+      "The VentureReady mark was awarded to " +
+      (fb.name || ("founder #" + founder_id)) + ".", "normal");
+  } else {
+    if (fb.email) {
+      notify("review_feedback", [fb.email],
+        "Your VentureReady review feedback is ready",
+        "Your expert review is complete, with feedback to act on before the next round. " +
+        "Sign in to VentureReady to see the details.", "normal");
+    }
+    notify("verdict_recorded", ["admins"],
+      "A reviewer verdict was recorded",
+      (reviewer || "A reviewer") + " recorded a 'not yet' verdict for " +
+      (fb.name || ("founder #" + founder_id)) + ".", "normal");
+  }
   return review_state(founder_id);
 }
 
@@ -470,6 +511,13 @@ const MAIL_ENABLED = !!(SMTP_HOST && SMTP_USER && SMTP_PASS && MAIL_FROM);
 function _admin_emails() {
   return db.prepare("SELECT email FROM admin_allowlist ORDER BY email ASC")
     .all().map((r) => r.email);
+}
+
+function _founder_brief(founder_id) {
+  // Name/email/company for composing a notification about a founder.
+  const row = db.prepare("SELECT name, email, company FROM founder WHERE id=?").get(founder_id);
+  if (!row) return { name: "", email: "", company: "" };
+  return { name: row.name || "", email: row.email || "", company: row.company || "" };
 }
 
 function _expand_recipients(recipients) {
@@ -676,6 +724,7 @@ function founder_google_upsert(sub, email, name) {
     row = db.prepare("SELECT * FROM founder WHERE email=?").get(email);
   }
   let fid;
+  let is_new = false;
   if (row) {
     // Attach the Google ID (and fill a blank name) without disturbing anything else.
     db.prepare("UPDATE founder SET google_sub=?, name=COALESCE(NULLIF(name,''), ?) WHERE id=?")
@@ -686,6 +735,14 @@ function founder_google_upsert(sub, email, name) {
       "INSERT INTO founder(name,email,google_sub,created_at) VALUES(?,?,?,datetime('now'))")
       .run(name || "New Founder", email, sub);
     fid = Number(cur.lastInsertRowid);
+    is_new = true;
+  }
+  if (is_new && email) {
+    notify("founder_welcome", [email],
+      "Welcome to VentureReady",
+      "Thanks for joining VentureReady, " + (name || "founder") +
+      ". You can now run the free positioning diagnostic and submit your deck for expert review.",
+      "normal");
   }
   return fid;
 }
@@ -1041,7 +1098,17 @@ async function handleGet(req, res, urlObj) {
 async function handlePost(req, res, urlObj, data) {
   const p = urlObj.pathname;
   if (p === "/api/verify-member") {
-    return sendJson(res, 200, await verify_member(data.email || ""));
+    const vm = await verify_member(data.email || "");
+    // A definitive "not a member" (Zoho reached, no active record) is a gate
+    // failure worth flagging to admins. "unreachable" is NOT a failure — we just
+    // couldn't check — so it does not notify.
+    if (data.email && !vm.member && !vm.unreachable) {
+      notify("membership_failed", ["admins"],
+        "Membership check failed at the gate",
+        "A sign-in was blocked: " + (data.email || "") +
+        " was not found as an active TiE Bangalore member in Zoho.", "high");
+    }
+    return sendJson(res, 200, vm);
   } else if (p === "/api/founder") {
     return sendJson(res, 200, founder_upsert(data));
   } else if (p === "/api/signup") {

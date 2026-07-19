@@ -119,6 +119,10 @@ def support_add(d):
     conn.commit()
     row = dict(conn.execute("SELECT * FROM support WHERE id=?", (rid,)).fetchone())
     conn.close()
+    notify("support_request", ["admins"],
+           "New support request: " + (d.get("subject") or "(no subject)"),
+           (d.get("from_name") or "Someone") + " (" + (d.get("role") or "user") +
+           ") submitted a support request. " + (d.get("message") or ""), "normal")
     return row
 def support_list():
     conn = _db()
@@ -180,7 +184,13 @@ def founder_signup(d):
     # Check TiE membership with Zoho as part of signing up, so the new profile
     # already shows the correct member status.
     refreshed = refresh_membership(fid)
-    return {"founder": _public_founder(refreshed or row)}
+    _pub = _public_founder(refreshed or row) or {}
+    notify("founder_welcome", [email],
+           "Welcome to VentureReady",
+           "Thanks for creating your VentureReady account, " + (_pub.get("name") or "founder") +
+           ". You can now run the free positioning diagnostic and submit your deck for expert review.",
+           "normal")
+    return {"founder": _pub}
 
 def founder_login(email, password):
     """Verify credentials in constant time. Returns the public profile or an error."""
@@ -250,6 +260,12 @@ def deck_add(founder_id, filename, raw):
     did = cur.lastrowid
     conn.commit()
     conn.close()
+    fb = _founder_brief(founder_id)
+    notify("deck_submitted", ["admins"],
+           "New deck submitted for review",
+           (fb["name"] or "A founder") +
+           ((" (" + fb["company"] + ")") if fb["company"] else "") +
+           " uploaded a pitch deck: " + (filename or "deck") + ".", "normal")
     return did
 
 # ---- Expert review rounds & the one-free-re-review rule ----
@@ -266,6 +282,28 @@ def review_add(founder_id, verdict, gaps, reviewer, note):
                  (founder_id, rnd, verdict, json.dumps(gaps or []), reviewer or "TiE Reviewer", note or ""))
     conn.commit()
     conn.close()
+    fb = _founder_brief(founder_id)
+    if verdict == "awarded":
+        if fb["email"]:
+            notify("mark_awarded", [fb["email"]],
+                   "You have earned the VentureReady mark",
+                   "Congratulations " + (fb["name"] or "") +
+                   " — your venture has been awarded the VentureReady mark. Screened investors can now discover your profile.",
+                   "high")
+        notify("mark_awarded_admin", ["admins"],
+               "VentureReady mark awarded",
+               "The VentureReady mark was awarded to " +
+               (fb["name"] or ("founder #" + str(founder_id))) + ".", "normal")
+    else:
+        if fb["email"]:
+            notify("review_feedback", [fb["email"]],
+                   "Your VentureReady review feedback is ready",
+                   "Your expert review is complete, with feedback to act on before the next round. "
+                   "Sign in to VentureReady to see the details.", "normal")
+        notify("verdict_recorded", ["admins"],
+               "A reviewer verdict was recorded",
+               (reviewer or "A reviewer") + " recorded a 'not yet' verdict for " +
+               (fb["name"] or ("founder #" + str(founder_id))) + ".", "normal")
     return review_state(founder_id)
 
 def review_state(founder_id):
@@ -491,6 +529,17 @@ def _admin_emails():
     conn.close()
     return [r["email"] for r in rows]
 
+def _founder_brief(founder_id):
+    # Name/email/company for composing a notification about a founder.
+    conn = _db()
+    row = conn.execute("SELECT name, email, company FROM founder WHERE id=?",
+                       (founder_id,)).fetchone()
+    conn.close()
+    if not row:
+        return {"name": "", "email": "", "company": ""}
+    return {"name": row["name"] or "", "email": row["email"] or "",
+            "company": row["company"] or ""}
+
 def _expand_recipients(recipients):
     # Accept a list of email addresses and/or the token "admins" (= everyone on
     # the allow-list). Returns a de-duplicated list with blanks removed.
@@ -695,6 +744,7 @@ def founder_google_upsert(sub, email, name):
     Google accounts have no password — that's fine; password columns stay null."""
     conn = _db()
     email = (email or "").strip().lower()
+    is_new = False
     row = conn.execute("SELECT * FROM founder WHERE google_sub=?", (sub,)).fetchone()
     if not row and email:
         row = conn.execute("SELECT * FROM founder WHERE email=?", (email,)).fetchone()
@@ -708,8 +758,15 @@ def founder_google_upsert(sub, email, name):
             "INSERT INTO founder(name,email,google_sub,created_at) VALUES(?,?,?,datetime('now'))",
             (name or "New Founder", email, sub))
         fid = cur.lastrowid
+        is_new = True
     conn.commit()
     conn.close()
+    if is_new and email:
+        notify("founder_welcome", [email],
+               "Welcome to VentureReady",
+               "Thanks for joining VentureReady, " + (name or "founder") +
+               ". You can now run the free positioning diagnostic and submit your deck for expert review.",
+               "normal")
     return fid
 
 def founder_google_login(id_token):
@@ -1025,7 +1082,16 @@ class Handler(BaseHTTPRequestHandler):
             data = {}
         try:
             if self.path == "/api/verify-member":
-                self._send(200, verify_member(data.get("email", "")))
+                _vm = verify_member(data.get("email", ""))
+                # A definitive "not a member" (Zoho reached, no active record) is a
+                # gate failure worth flagging to admins. "unreachable" is NOT a
+                # failure — we just couldn't check — so it does not notify.
+                if data.get("email") and (not _vm.get("member")) and (not _vm.get("unreachable")):
+                    notify("membership_failed", ["admins"],
+                           "Membership check failed at the gate",
+                           "A sign-in was blocked: " + data.get("email", "") +
+                           " was not found as an active TiE Bangalore member in Zoho.", "high")
+                self._send(200, _vm)
             elif self.path == "/api/founder":
                 self._send(200, founder_upsert(data))
             elif self.path == "/api/signup":
