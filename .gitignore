@@ -1,6 +1,7 @@
 # ── Secrets — NEVER commit ────────────────────────────────
 .env
 .env.*
+!.env.example
 secrets/
 
 # ── Live data & user uploads (private to real users) ──────
