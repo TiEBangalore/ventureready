@@ -1,0 +1,28 @@
+# ── Secrets — NEVER commit ────────────────────────────────
+.env
+.env.*
+secrets/
+
+# ── Live data & user uploads (private to real users) ──────
+data.db
+data.db-journal
+decks/
+dataroom/
+
+# ── Confidential sample/real pitch decks ──────────────────
+*.pdf
+
+# ── Local agent/editor config (not part of the app) ───────
+.claude/
+
+# ── OS / editor junk ──────────────────────────────────────
+.DS_Store
+**/.DS_Store
+*~
+~$*
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
