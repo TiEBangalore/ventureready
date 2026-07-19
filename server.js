@@ -48,6 +48,19 @@ function db_init() {
   if (!cols.includes("password_salt")) {
     db.exec("ALTER TABLE founder ADD COLUMN password_salt TEXT");
   }
+  // Membership snapshot columns. These CACHE Zoho's answer, refreshed at each
+  // sign-in (Zoho stays the source of truth). membership_stale=1 means the last
+  // refresh couldn't reach Zoho, so these values are the last CONFIRMED status.
+  const memCols = [
+    ["is_member", "INTEGER"], ["membership_status", "TEXT"],
+    ["membership_category", "TEXT"], ["membership_name", "TEXT"],
+    ["membership_checked_at", "TEXT"], ["membership_stale", "INTEGER"],
+  ];
+  for (const [mcol, mtype] of memCols) {
+    if (!cols.includes(mcol)) {
+      db.exec(`ALTER TABLE founder ADD COLUMN ${mcol} ${mtype}`);
+    }
+  }
   // Each uploaded deck: the file lives on disk (stored_path); the DB keeps a pointer + owner.
   db.exec(`CREATE TABLE IF NOT EXISTS deck(
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, filename TEXT,
@@ -133,7 +146,7 @@ function public_founder(row) {
   return out;
 }
 
-function founder_signup(d) {
+async function founder_signup(d) {
   // Register a founder with a password. Errors if the email already has one.
   const email = (d.email || "").trim().toLowerCase();
   const password = d.password || "";
@@ -160,10 +173,13 @@ function founder_signup(d) {
     fid = Number(cur.lastInsertRowid);
   }
   const row = db.prepare("SELECT * FROM founder WHERE id=?").get(fid);
-  return { founder: public_founder(row) };
+  // Check TiE membership with Zoho as part of signing up, so the new profile
+  // already shows the correct member status.
+  const refreshed = await refresh_membership(fid);
+  return { founder: public_founder(refreshed || row) };
 }
 
-function founder_login(email, password) {
+async function founder_login(email, password) {
   // Verify credentials in constant time. Returns the public profile or an error.
   email = (email || "").trim().toLowerCase();
   const row = db.prepare("SELECT * FROM founder WHERE email=?").get(email);
@@ -174,7 +190,9 @@ function founder_login(email, password) {
   if (!timing_safe_equal(calc, row.password_hash)) {
     return { error: "Incorrect email or password." };
   }
-  return { founder: public_founder(row) };
+  // Re-check TiE membership with Zoho on every sign-in and cache the result.
+  const refreshed = await refresh_membership(row.id);
+  return { founder: public_founder(refreshed || row) };
 }
 
 function founder_upsert(d) {
@@ -364,7 +382,16 @@ async function zoho_token() {
 }
 
 async function verify_member(email) {
-  // Returns object: {member: bool, name, status, category}.
+  // Ask Zoho whether this email is a current TiE Bangalore member.
+  //
+  // Returns one of three shapes:
+  //   - Found & answered:   {member: bool, name, status, category}
+  //   - Reached, no record: {member: false, reason: "not found", status: ""}
+  //   - COULD NOT REACH:    {member: false, unreachable: true, reason: ...}
+  //
+  // The `unreachable` flag lets callers tell "Zoho says not a member" apart from
+  // "we couldn't check right now", so we keep the last CONFIRMED status instead
+  // of wrongly wiping someone's membership on a Zoho outage.
   email = (email || "").trim();
   if (!email) return { member: false, reason: "no email" };
   const params = new URLSearchParams({
@@ -375,10 +402,16 @@ async function verify_member(email) {
   });
   const url = "https://creator.zoho.com/api/v2.1/tie_dev/chapters/report/Member_Details_Admin_View?" + params.toString();
   try {
+    // zoho_token() can itself fail if Zoho's auth server is down — keep it inside
+    // the try so an auth outage counts as "unreachable", not "not found".
     const resp = await fetch(url, { headers: { Authorization: "Zoho-oauthtoken " + (await zoho_token()) } });
     if (!resp.ok) {
-      // code 9220 = no matching record = not a member
-      return { member: false, reason: "not found" };
+      // 5xx = Zoho itself is having trouble → treat as unreachable (keep last known).
+      // 4xx (incl. code 9220 = no matching record) = a real answer: not a member.
+      if (resp.status >= 500) {
+        return { member: false, unreachable: true, reason: "zoho error " + resp.status };
+      }
+      return { member: false, reason: "not found", status: "" };
     }
     const d = await resp.json();
     const rec = (d.data || [{}])[0] || {};
@@ -390,8 +423,35 @@ async function verify_member(email) {
       category: (rec.Membership_Category1 || {}).zc_display_value || "",
     };
   } catch (e) {
-    return { member: false, reason: "not found" };
+    // Network timeout, DNS failure, auth failure, bad JSON — we couldn't get a
+    // trustworthy answer, so don't overwrite what we already know.
+    return { member: false, unreachable: true, reason: String(e) };
   }
+}
+
+async function refresh_membership(founder_id) {
+  // Re-check a founder's TiE membership with Zoho and cache the answer.
+  //
+  // Called at every sign-in (login and signup). Zoho stays the source of truth;
+  // the founder row just caches the latest answer so the profile shows it.
+  //
+  // If Zoho can't be reached we KEEP the last confirmed values and only flip
+  // membership_stale=1, so the UI can say "showing last confirmed status". A
+  // successful check clears the stale flag. Returns the fresh founder row.
+  const row = db.prepare("SELECT * FROM founder WHERE id=?").get(founder_id);
+  if (!row) return null;
+  const res = await verify_member(row.email);
+  if (res.unreachable) {
+    // Couldn't reach Zoho — leave the cached snapshot untouched, just flag it stale.
+    db.prepare("UPDATE founder SET membership_stale=1 WHERE id=?").run(founder_id);
+  } else {
+    db.prepare(
+      "UPDATE founder SET is_member=?, membership_status=?, membership_category=?, " +
+      "membership_name=?, membership_checked_at=datetime('now'), membership_stale=0 " +
+      "WHERE id=?").run(
+      res.member ? 1 : 0, res.status || "", res.category || "", res.name || "", founder_id);
+  }
+  return db.prepare("SELECT * FROM founder WHERE id=?").get(founder_id);
 }
 
 // ---- Deck text extraction (reads the founder's actual uploaded deck) ----
@@ -731,10 +791,10 @@ async function handlePost(req, res, urlObj, data) {
   } else if (p === "/api/founder") {
     return sendJson(res, 200, founder_upsert(data));
   } else if (p === "/api/signup") {
-    const out = founder_signup(data);
+    const out = await founder_signup(data);
     return sendJson(res, out.error ? 400 : 200, out);
   } else if (p === "/api/login") {
-    const out = founder_login(data.email || "", data.password || "");
+    const out = await founder_login(data.email || "", data.password || "");
     return sendJson(res, out.error ? 401 : 200, out);
   } else if (p === "/api/review") {
     // A reviewer submits a verdict — this is what the founder then sees.

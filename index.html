@@ -4513,6 +4513,18 @@ function _applyFounder(rec){
     ['Stage · Sector', (rec.stage||'')+' · '+(rec.sector||'')],
     ['Location', rec.city||''], ['Member since', (rec.created_at||'Just now').split(' ')[0]]
   ];
+  // TiE membership — refreshed from Zoho at each sign-in. Show the current
+  // standing, and if we couldn't reach Zoho this time, flag that the value is
+  // the last CONFIRMED status rather than a fresh check.
+  var mem;
+  if(rec.is_member){ mem = 'Active'+(rec.membership_category?(' · '+rec.membership_category):''); }
+  else if(rec.membership_status){ mem = rec.membership_status; }
+  else { mem = 'Not a current member'; }
+  if(rec.membership_stale){
+    var when = (rec.membership_checked_at||'').split(' ')[0];
+    mem += ' ⚠ couldn’t reach TiE records just now — showing last confirmed status'+(when?(' ('+when+')'):'');
+  }
+  PROFILES.founder.rows.push(['TiE membership', mem]);
   // Bring back their last saved AI read so it survives a refresh.
   if(rec.latest_diagnostic){
     window._lastDiag = rec.latest_diagnostic;
@@ -4648,6 +4660,11 @@ async function verifyMember(){
       out.style.color='#15803d';
       out.innerHTML='✓ <strong>Active TiE Bangalore member</strong> — '+(d.name||'')+(d.category?(' · '+d.category):'');
       cont.style.display='';
+    } else if(d.unreachable){
+      // Zoho couldn't be reached — don't tell the person they're not a member,
+      // because we simply couldn't check. Ask them to try again shortly.
+      out.style.color='#b45309';
+      out.innerHTML='⚠ Couldn’t reach TiE Bangalore membership records just now — please try again in a moment.';
     } else {
       out.style.color='#b91c1c';
       out.innerHTML='✗ This email is <strong>not an active TiE Bangalore member</strong>. Choose an option below to continue.';

@@ -35,6 +35,14 @@ def db_init():
         conn.execute("ALTER TABLE founder ADD COLUMN password_hash TEXT")
     if "password_salt" not in _cols:
         conn.execute("ALTER TABLE founder ADD COLUMN password_salt TEXT")
+    # Membership snapshot columns. These CACHE Zoho's answer, refreshed at each
+    # sign-in (Zoho stays the source of truth). membership_stale=1 means the last
+    # refresh couldn't reach Zoho, so these values are the last CONFIRMED status.
+    for _mcol, _mtype in (("is_member", "INTEGER"), ("membership_status", "TEXT"),
+                          ("membership_category", "TEXT"), ("membership_name", "TEXT"),
+                          ("membership_checked_at", "TEXT"), ("membership_stale", "INTEGER")):
+        if _mcol not in _cols:
+            conn.execute("ALTER TABLE founder ADD COLUMN %s %s" % (_mcol, _mtype))
     # Each uploaded deck: the file lives on disk (stored_path); the DB keeps a pointer + owner.
     conn.execute("""CREATE TABLE IF NOT EXISTS deck(
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, filename TEXT,
@@ -140,7 +148,10 @@ def founder_signup(d):
     conn.commit()
     row = conn.execute("SELECT * FROM founder WHERE id=?", (fid,)).fetchone()
     conn.close()
-    return {"founder": _public_founder(row)}
+    # Check TiE membership with Zoho as part of signing up, so the new profile
+    # already shows the correct member status.
+    refreshed = refresh_membership(fid)
+    return {"founder": _public_founder(refreshed or row)}
 
 def founder_login(email, password):
     """Verify credentials in constant time. Returns the public profile or an error."""
@@ -153,7 +164,9 @@ def founder_login(email, password):
     calc, _ = _hash_pw(password, row["password_salt"])
     if not hmac.compare_digest(calc, row["password_hash"]):
         return {"error": "Incorrect email or password."}
-    return {"founder": _public_founder(row)}
+    # Re-check TiE membership with Zoho on every sign-in and cache the result.
+    refreshed = refresh_membership(row["id"])
+    return {"founder": _public_founder(refreshed or row)}
 
 def founder_upsert(d):
     """Create or update a founder by email, then return the full row (with its id)."""
@@ -352,7 +365,17 @@ def zoho_token():
     return _token["value"]
 
 def verify_member(email):
-    """Returns dict: {member: bool, name, status, category}. """
+    """Ask Zoho whether this email is a current TiE Bangalore member.
+
+    Returns a dict. Three possible shapes:
+      - Found & answered:  {member: bool, name, status, category}
+      - Reached, no record: {member: False, reason: "not found", status: ""}
+      - COULD NOT REACH Zoho: {member: False, unreachable: True, reason: ...}
+
+    The `unreachable` flag matters: it lets callers tell "Zoho says they are not a
+    member" apart from "we simply couldn't check right now", so we can keep the
+    last CONFIRMED status instead of wrongly wiping someone's membership.
+    """
     email = (email or "").strip()
     if not email:
         return {"member": False, "reason": "no email"}
@@ -363,8 +386,10 @@ def verify_member(email):
         "Chapter_Name": CHAPTER,
     })
     url = "https://creator.zoho.com/api/v2.1/tie_dev/chapters/report/Member_Details_Admin_View?" + params
-    req = urllib.request.Request(url, headers={"Authorization": "Zoho-oauthtoken " + zoho_token()})
     try:
+        # zoho_token() can itself fail if Zoho's auth server is down — keep it
+        # inside the try so an auth outage counts as "unreachable", not "not found".
+        req = urllib.request.Request(url, headers={"Authorization": "Zoho-oauthtoken " + zoho_token()})
         d = json.loads(urllib.request.urlopen(req, timeout=20).read())
         rec = (d.get("data") or [{}])[0]
         status = rec.get("Status", "")
@@ -375,9 +400,46 @@ def verify_member(email):
             "category": (rec.get("Membership_Category1") or {}).get("zc_display_value", ""),
         }
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "ignore")
-        # code 9220 = no matching record = not a member
-        return {"member": False, "reason": "not found"}
+        # 5xx = Zoho itself is having trouble → treat as unreachable (keep last known).
+        # 4xx (incl. code 9220 = no matching record) = a real answer: not a member.
+        if e.code >= 500:
+            return {"member": False, "unreachable": True, "reason": "zoho error %s" % e.code}
+        return {"member": False, "reason": "not found", "status": ""}
+    except Exception as e:
+        # Network timeout, DNS failure, auth failure, bad JSON — we couldn't get a
+        # trustworthy answer, so don't overwrite what we already know.
+        return {"member": False, "unreachable": True, "reason": str(e)}
+
+def refresh_membership(founder_id):
+    """Re-check a founder's TiE membership with Zoho and cache the answer.
+
+    Called at every sign-in (login and signup). Zoho stays the source of truth;
+    the founder row just caches the latest answer so the profile shows it.
+
+    If Zoho can't be reached we KEEP the last confirmed values and only flip
+    membership_stale=1, so the UI can say "showing last confirmed status". A
+    successful check clears the stale flag. Returns the fresh founder row.
+    """
+    conn = _db()
+    row = conn.execute("SELECT * FROM founder WHERE id=?", (founder_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    res = verify_member(row["email"])
+    if res.get("unreachable"):
+        # Couldn't reach Zoho — leave the cached snapshot untouched, just flag it stale.
+        conn.execute("UPDATE founder SET membership_stale=1 WHERE id=?", (founder_id,))
+    else:
+        conn.execute(
+            "UPDATE founder SET is_member=?, membership_status=?, membership_category=?, "
+            "membership_name=?, membership_checked_at=datetime('now'), membership_stale=0 "
+            "WHERE id=?",
+            (1 if res.get("member") else 0, res.get("status", ""),
+             res.get("category", ""), res.get("name", ""), founder_id))
+    conn.commit()
+    out = conn.execute("SELECT * FROM founder WHERE id=?", (founder_id,)).fetchone()
+    conn.close()
+    return out
 
 # ---- Deck text extraction (reads the founder's actual uploaded deck) ----
 # How many slide pictures we'll send the AI, and how big each may be.
