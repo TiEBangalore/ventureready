@@ -61,6 +61,12 @@ function db_init() {
       db.exec(`ALTER TABLE founder ADD COLUMN ${mcol} ${mtype}`);
     }
   }
+  // google_sub = Google's stable, unique ID for the account (the "sub" claim).
+  // We match on this first so a founder who later changes their Gmail address
+  // still maps to the same record. Nullable: password-only accounts don't have it.
+  if (!cols.includes("google_sub")) {
+    db.exec("ALTER TABLE founder ADD COLUMN google_sub TEXT");
+  }
   // Each uploaded deck: the file lives on disk (stored_path); the DB keeps a pointer + owner.
   db.exec(`CREATE TABLE IF NOT EXISTS deck(
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, filename TEXT,
@@ -359,6 +365,12 @@ try {
 const ZOHO_CLIENT_ID = ENV.ZOHO_CLIENT_ID || "";
 const ZOHO_CLIENT_SECRET = ENV.ZOHO_CLIENT_SECRET || "";
 const ANTHROPIC_API_KEY = ENV.ANTHROPIC_API_KEY || "";
+// Google sign-in ("Continue with Google"). This is the PUBLIC OAuth Client ID —
+// it is safe to expose to the browser (that's how Google's button works). There
+// is NO client secret here: the browser gets a signed ID token and the server
+// only verifies it, so no secret is needed for this flow. Blank = feature off
+// (the button falls back to the demo sign-in).
+const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID || "";
 const CHAPTER = "TiE Bangalore";
 
 // ---- Zoho token cache (token lives 1 hour) ----
@@ -452,6 +464,80 @@ async function refresh_membership(founder_id) {
       res.member ? 1 : 0, res.status || "", res.category || "", res.name || "", founder_id);
   }
   return db.prepare("SELECT * FROM founder WHERE id=?").get(founder_id);
+}
+
+// ---- "Continue with Google" sign-in ----
+// Google proves IDENTITY (who the person is). It does NOT prove TiE membership —
+// that's still Zoho's job, run right after via refresh_membership(). The two gates
+// stay separate: identity first, membership second.
+async function verify_google_token(idToken) {
+  // Verify the signed ID token the browser got from Google. We ask Google's own
+  // tokeninfo endpoint to validate it (so we're not hand-rolling JWT crypto), then
+  // we still check the audience/issuer/verified-email ourselves — never trust a
+  // token that wasn't minted for THIS app.
+  //
+  // NOTE FOR PRODUCTION: for higher volume, verify the token locally against
+  // Google's public keys using a vetted library (e.g. google-auth-library) instead
+  // of the tokeninfo endpoint. Behaviour is identical; this is simpler for a pilot.
+  if (!GOOGLE_CLIENT_ID) return { error: "Google sign-in is not configured on this server." };
+  if (!idToken) return { error: "No Google credential was provided." };
+  let d;
+  try {
+    const resp = await fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken));
+    if (!resp.ok) return { error: "Google could not verify that sign-in. Please try again." };
+    d = await resp.json();
+  } catch (e) {
+    return { error: "Couldn’t reach Google to verify the sign-in. Please try again." };
+  }
+  // aud must be OUR client ID — this stops a token issued for another app being replayed here.
+  if (d.aud !== GOOGLE_CLIENT_ID) return { error: "That sign-in was not issued for this app." };
+  // iss must be Google.
+  if (d.iss !== "accounts.google.com" && d.iss !== "https://accounts.google.com") {
+    return { error: "That sign-in did not come from Google." };
+  }
+  // Token must not be expired.
+  if (d.exp && (Date.now() / 1000) > parseInt(d.exp, 10)) {
+    return { error: "That Google sign-in has expired. Please try again." };
+  }
+  // Only accept a verified email — we key TiE membership off the email address.
+  if (String(d.email_verified) !== "true" || !d.email) {
+    return { error: "Your Google email isn’t verified, so we can’t use it to sign in." };
+  }
+  return { sub: d.sub, email: (d.email || "").trim().toLowerCase(), name: d.name || "" };
+}
+
+function founder_google_upsert(sub, email, name) {
+  // Find the founder by Google ID first, then by email, else create a new record.
+  // Google accounts have no password — that's fine; password columns stay null.
+  email = (email || "").trim().toLowerCase();
+  let row = db.prepare("SELECT * FROM founder WHERE google_sub=?").get(sub);
+  if (!row && email) {
+    row = db.prepare("SELECT * FROM founder WHERE email=?").get(email);
+  }
+  let fid;
+  if (row) {
+    // Attach the Google ID (and fill a blank name) without disturbing anything else.
+    db.prepare("UPDATE founder SET google_sub=?, name=COALESCE(NULLIF(name,''), ?) WHERE id=?")
+      .run(sub, name || "", row.id);
+    fid = row.id;
+  } else {
+    const cur = db.prepare(
+      "INSERT INTO founder(name,email,google_sub,created_at) VALUES(?,?,?,datetime('now'))")
+      .run(name || "New Founder", email, sub);
+    fid = Number(cur.lastInsertRowid);
+  }
+  return fid;
+}
+
+async function founder_google_login(idToken) {
+  // Full flow: verify identity with Google → find/create the founder → re-check
+  // TiE membership with Zoho → return the public profile.
+  const v = await verify_google_token(idToken);
+  if (v.error) return { error: v.error };
+  const fid = founder_google_upsert(v.sub, v.email, v.name);
+  const refreshed = await refresh_membership(fid);
+  const row = refreshed || db.prepare("SELECT * FROM founder WHERE id=?").get(fid);
+  return { founder: public_founder(row) };
 }
 
 // ---- Deck text extraction (reads the founder's actual uploaded deck) ----
@@ -759,6 +845,11 @@ function b64ToBuffer(b64) {
 async function handleGet(req, res, urlObj) {
   const rawPath = urlObj.pathname;
   const p = (rawPath === "/" || rawPath === "") ? "/index.html" : rawPath;
+  if (p === "/api/config") {
+    // Public front-end config. Only non-secret values belong here. The Google
+    // Client ID is designed to be public; the browser needs it to show the button.
+    return sendJson(res, 200, { googleClientId: GOOGLE_CLIENT_ID });
+  }
   if (p === "/api/support") return sendJson(res, 200, support_list());
   if (p === "/api/review") {
     const fid = urlObj.searchParams.get("founder_id") || "";
@@ -795,6 +886,11 @@ async function handlePost(req, res, urlObj, data) {
     return sendJson(res, out.error ? 400 : 200, out);
   } else if (p === "/api/login") {
     const out = await founder_login(data.email || "", data.password || "");
+    return sendJson(res, out.error ? 401 : 200, out);
+  } else if (p === "/api/auth/google") {
+    // "Continue with Google": verify the Google credential, find/create the
+    // founder, refresh their TiE membership, and return the profile.
+    const out = await founder_google_login(data.credential || "");
     return sendJson(res, out.error ? 401 : 200, out);
   } else if (p === "/api/review") {
     // A reviewer submits a verdict — this is what the founder then sees.

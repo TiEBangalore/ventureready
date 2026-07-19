@@ -43,6 +43,11 @@ def db_init():
                           ("membership_checked_at", "TEXT"), ("membership_stale", "INTEGER")):
         if _mcol not in _cols:
             conn.execute("ALTER TABLE founder ADD COLUMN %s %s" % (_mcol, _mtype))
+    # google_sub = Google's stable, unique ID for the account (the "sub" claim).
+    # We match on this first so a founder who later changes their Gmail address
+    # still maps to the same record. Nullable: password-only accounts don't have it.
+    if "google_sub" not in _cols:
+        conn.execute("ALTER TABLE founder ADD COLUMN google_sub TEXT")
     # Each uploaded deck: the file lives on disk (stored_path); the DB keeps a pointer + owner.
     conn.execute("""CREATE TABLE IF NOT EXISTS deck(
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, filename TEXT,
@@ -344,6 +349,11 @@ except FileNotFoundError:
 ZOHO_CLIENT_ID = ENV.get("ZOHO_CLIENT_ID", "")
 ZOHO_CLIENT_SECRET = ENV.get("ZOHO_CLIENT_SECRET", "")
 ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY", "")
+# Google sign-in ("Continue with Google"). This is the PUBLIC OAuth Client ID —
+# safe to expose to the browser (that's how Google's button works). There is NO
+# client secret here: the browser gets a signed ID token and the server only
+# verifies it, so no secret is needed. Blank = feature off (button falls back to demo).
+GOOGLE_CLIENT_ID = ENV.get("GOOGLE_CLIENT_ID", "")
 CHAPTER = "TiE Bangalore"
 
 # ---- Zoho token cache (token lives 1 hour) ----
@@ -440,6 +450,84 @@ def refresh_membership(founder_id):
     out = conn.execute("SELECT * FROM founder WHERE id=?", (founder_id,)).fetchone()
     conn.close()
     return out
+
+# ---- "Continue with Google" sign-in ----
+# Google proves IDENTITY (who the person is). It does NOT prove TiE membership —
+# that's still Zoho's job, run right after via refresh_membership(). The two gates
+# stay separate: identity first, membership second.
+def verify_google_token(id_token):
+    """Verify the signed ID token the browser got from Google.
+
+    We ask Google's own tokeninfo endpoint to validate it (so we're not
+    hand-rolling JWT crypto), then still check audience/issuer/verified-email
+    ourselves — never trust a token that wasn't minted for THIS app.
+
+    NOTE FOR PRODUCTION: for higher volume, verify the token locally against
+    Google's public keys with a vetted library instead of the tokeninfo endpoint.
+    """
+    if not GOOGLE_CLIENT_ID:
+        return {"error": "Google sign-in is not configured on this server."}
+    if not id_token:
+        return {"error": "No Google credential was provided."}
+    try:
+        url = "https://oauth2.googleapis.com/tokeninfo?id_token=" + urllib.parse.quote(id_token)
+        d = json.loads(urllib.request.urlopen(url, timeout=20).read())
+    except urllib.error.HTTPError:
+        return {"error": "Google could not verify that sign-in. Please try again."}
+    except Exception:
+        return {"error": "Couldn't reach Google to verify the sign-in. Please try again."}
+    # aud must be OUR client ID — stops a token issued for another app being replayed here.
+    if d.get("aud") != GOOGLE_CLIENT_ID:
+        return {"error": "That sign-in was not issued for this app."}
+    # iss must be Google.
+    if d.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        return {"error": "That sign-in did not come from Google."}
+    # Token must not be expired.
+    try:
+        if d.get("exp") and time.time() > int(d["exp"]):
+            return {"error": "That Google sign-in has expired. Please try again."}
+    except (TypeError, ValueError):
+        pass
+    # Only accept a verified email — we key TiE membership off the email address.
+    if str(d.get("email_verified")).lower() != "true" or not d.get("email"):
+        return {"error": "Your Google email isn't verified, so we can't use it to sign in."}
+    return {"sub": d.get("sub"), "email": (d.get("email") or "").strip().lower(), "name": d.get("name", "")}
+
+def founder_google_upsert(sub, email, name):
+    """Find the founder by Google ID first, then by email, else create a new record.
+    Google accounts have no password — that's fine; password columns stay null."""
+    conn = _db()
+    email = (email or "").strip().lower()
+    row = conn.execute("SELECT * FROM founder WHERE google_sub=?", (sub,)).fetchone()
+    if not row and email:
+        row = conn.execute("SELECT * FROM founder WHERE email=?", (email,)).fetchone()
+    if row:
+        # Attach the Google ID (and fill a blank name) without disturbing anything else.
+        conn.execute("UPDATE founder SET google_sub=?, name=COALESCE(NULLIF(name,''), ?) WHERE id=?",
+                     (sub, name or "", row["id"]))
+        fid = row["id"]
+    else:
+        cur = conn.execute(
+            "INSERT INTO founder(name,email,google_sub,created_at) VALUES(?,?,?,datetime('now'))",
+            (name or "New Founder", email, sub))
+        fid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return fid
+
+def founder_google_login(id_token):
+    """Full flow: verify identity with Google → find/create the founder → re-check
+    TiE membership with Zoho → return the public profile."""
+    v = verify_google_token(id_token)
+    if v.get("error"):
+        return {"error": v["error"]}
+    fid = founder_google_upsert(v["sub"], v["email"], v["name"])
+    refreshed = refresh_membership(fid)
+    if refreshed is None:
+        conn = _db()
+        refreshed = conn.execute("SELECT * FROM founder WHERE id=?", (fid,)).fetchone()
+        conn.close()
+    return {"founder": _public_founder(refreshed)}
 
 # ---- Deck text extraction (reads the founder's actual uploaded deck) ----
 # How many slide pictures we'll send the AI, and how big each may be.
@@ -698,6 +786,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = "/index.html" if self.path in ("/", "") else self.path.split("?")[0]
+        if path == "/api/config":
+            # Public front-end config. Only non-secret values belong here. The
+            # Google Client ID is designed to be public (the browser needs it).
+            return self._send(200, {"googleClientId": GOOGLE_CLIENT_ID})
         if path == "/api/support":
             return self._send(200, support_list())
         if path == "/api/review":
@@ -742,6 +834,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(400 if out.get("error") else 200, out)
             elif self.path == "/api/login":
                 out = founder_login(data.get("email", ""), data.get("password", ""))
+                self._send(401 if out.get("error") else 200, out)
+            elif self.path == "/api/auth/google":
+                # "Continue with Google": verify the Google credential, find/create
+                # the founder, refresh their TiE membership, and return the profile.
+                out = founder_google_login(data.get("credential", ""))
                 self._send(401 if out.get("error") else 200, out)
             elif self.path == "/api/review":
                 # A reviewer submits a verdict — this is what the founder then sees.

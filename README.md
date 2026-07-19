@@ -39,6 +39,7 @@ git-ignored and must never be committed.
 | Variable | Purpose | If missing |
 |----------|---------|------------|
 | `ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` | TiE membership verification at login (Zoho Creator API) | Membership check disabled; rest of app works |
+| `GOOGLE_CLIENT_ID` | "Continue with Google" sign-in (public OAuth Client ID from Google Cloud Console). Add your app's URL as an Authorized JavaScript origin. | Google button falls back to the demo sign-in |
 | `ANTHROPIC_API_KEY` | Live AI positioning diagnostic (Claude) | Falls back to a canned sample result |
 | `ANTHROPIC_MODEL` | Optional — pin a specific Claude model | Uses the default model |
 
