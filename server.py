@@ -6,7 +6,7 @@ Serves the prototype (index.html) and provides two LIVE endpoints:
 Run:  python3 server.py    then open http://localhost:8000
 """
 import json, time, os, io, base64, sqlite3, urllib.parse, urllib.request, urllib.error
-import hashlib, hmac, secrets
+import hashlib, hmac, secrets, re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +70,22 @@ def db_init():
     conn.execute("""CREATE TABLE IF NOT EXISTS dataroom_view(
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, doc_id INTEGER,
         item_key TEXT, viewer TEXT, viewed_at TEXT)""")
+    # Admin allow-list: who may enter the Team/Admin portal. The super-admin edits
+    # this from inside the portal, so this table is the LIVE source of truth. On
+    # first run it is seeded from ADMIN_SUPER_EMAIL + ADMIN_EMAILS (.env).
+    conn.execute("""CREATE TABLE IF NOT EXISTS admin_allowlist(
+        email TEXT PRIMARY KEY, added_by TEXT, added_at TEXT)""")
+    _admin_seed = set()
+    if ADMIN_SUPER_EMAIL:
+        _admin_seed.add(ADMIN_SUPER_EMAIL)
+    for _e in ENV.get("ADMIN_EMAILS", "").split(","):
+        _e = _e.strip().lower()
+        if _e:
+            _admin_seed.add(_e)
+    for _e in _admin_seed:
+        conn.execute("INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) "
+                     "VALUES(?,?,datetime('now'))", (_e, "seed"))
+    conn.commit()
     if conn.execute("SELECT COUNT(*) c FROM support").fetchone()["c"] == 0:
         seeds = [
             ("SUP-204", "Meera Suresh", "Founder", "TiE membership verification",
@@ -359,16 +375,10 @@ GOOGLE_CLIENT_ID = ENV.get("GOOGLE_CLIENT_ID", "")
 # Only these Google-verified emails may enter the admin portal. Access is an
 # explicit allow-list (NOT the whole @tiebangalore.org domain). The primary
 # inbox admin.blr@tiebangalore.org is always included and is the SUPER-ADMIN.
-# Add more admins via ADMIN_EMAILS (comma-separated) in .env; override the
-# super-admin via ADMIN_SUPER_EMAIL if ever needed.
+# ADMIN_EMAILS from .env is only a FIRST-RUN SEED. The live allow-list lives in
+# the admin_allowlist table (see db_init) so the super-admin can add/remove
+# admins from inside the portal without editing files or restarting the server.
 ADMIN_SUPER_EMAIL = ENV.get("ADMIN_SUPER_EMAIL", "admin.blr@tiebangalore.org").strip().lower()
-ADMIN_EMAILS = set()
-if ADMIN_SUPER_EMAIL:
-    ADMIN_EMAILS.add(ADMIN_SUPER_EMAIL)
-for _e in ENV.get("ADMIN_EMAILS", "").split(","):
-    _e = _e.strip().lower()
-    if _e:
-        ADMIN_EMAILS.add(_e)
 
 def admin_role_for(email):
     email = (email or "").strip().lower()
@@ -376,9 +386,60 @@ def admin_role_for(email):
         return None
     if email == ADMIN_SUPER_EMAIL:
         return "super-admin"
-    if email in ADMIN_EMAILS:
-        return "admin"
-    return None
+    conn = _db()
+    row = conn.execute("SELECT email FROM admin_allowlist WHERE email=?", (email,)).fetchone()
+    conn.close()
+    return "admin" if row else None
+
+def admin_list():
+    # Super-admin always sorts to the top; everyone else alphabetically.
+    conn = _db()
+    rows = conn.execute(
+        "SELECT email, added_by, added_at FROM admin_allowlist ORDER BY (email=?) DESC, email ASC",
+        (ADMIN_SUPER_EMAIL,)).fetchall()
+    conn.close()
+    return [{"email": r["email"],
+             "role": "super-admin" if r["email"] == ADMIN_SUPER_EMAIL else "admin",
+             "added_by": r["added_by"] or "",
+             "added_at": r["added_at"] or ""} for r in rows]
+
+def require_super_admin(id_token):
+    # Verify a Google credential and require it to be the SUPER-admin. Guards the
+    # admin-management endpoints: there are no sessions yet, so the caller proves
+    # who they are by sending their Google ID token with each request.
+    v = verify_google_token(id_token)
+    if v.get("error"):
+        return {"error": v["error"], "status": 401}
+    if admin_role_for(v["email"]) != "super-admin":
+        return {"error": "Only the super-admin can manage admin access.", "status": 403}
+    return {"email": v["email"]}
+
+def admin_add(id_token, email):
+    g = require_super_admin(id_token)
+    if g.get("error"):
+        return g
+    email = (email or "").strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return {"error": "Please enter a valid email address.", "status": 400}
+    conn = _db()
+    conn.execute("INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) "
+                 "VALUES(?,?,datetime('now'))", (email, g["email"]))
+    conn.commit()
+    conn.close()
+    return {"admins": admin_list()}
+
+def admin_remove(id_token, email):
+    g = require_super_admin(id_token)
+    if g.get("error"):
+        return g
+    email = (email or "").strip().lower()
+    if email == ADMIN_SUPER_EMAIL:
+        return {"error": "The super-admin can’t be removed.", "status": 400}
+    conn = _db()
+    conn.execute("DELETE FROM admin_allowlist WHERE email=?", (email,))
+    conn.commit()
+    conn.close()
+    return {"admins": admin_list()}
 
 CHAPTER = "TiE Bangalore"
 
@@ -868,6 +929,27 @@ class Handler(BaseHTTPRequestHandler):
                 # the founder, refresh their TiE membership, and return the profile.
                 out = founder_google_login(data.get("credential", ""))
                 self._send(401 if out.get("error") else 200, out)
+            elif self.path == "/api/admin/list":
+                # Super-admin only: read the admin allow-list.
+                g = require_super_admin(data.get("credential", ""))
+                if g.get("error"):
+                    self._send(g["status"], {"error": g["error"]})
+                else:
+                    self._send(200, {"admins": admin_list()})
+            elif self.path == "/api/admin/add":
+                # Super-admin only: add an approved admin email.
+                out = admin_add(data.get("credential", ""), data.get("email", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/admin/remove":
+                # Super-admin only: remove an admin email (super-admin can't be removed).
+                out = admin_remove(data.get("credential", ""), data.get("email", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
             elif self.path == "/api/review":
                 # A reviewer submits a verdict — this is what the founder then sees.
                 fid = data.get("founder_id")

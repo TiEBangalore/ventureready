@@ -89,6 +89,20 @@ function db_init() {
   db.exec(`CREATE TABLE IF NOT EXISTS dataroom_view(
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, doc_id INTEGER,
       item_key TEXT, viewer TEXT, viewed_at TEXT)`);
+  // Admin allow-list: who may enter the Team/Admin portal. The super-admin edits
+  // this from inside the portal, so this table is the LIVE source of truth. On
+  // first run it is seeded from ADMIN_SUPER_EMAIL + ADMIN_EMAILS (.env).
+  db.exec(`CREATE TABLE IF NOT EXISTS admin_allowlist(
+      email TEXT PRIMARY KEY, added_by TEXT, added_at TEXT)`);
+  const _adminSeed = new Set();
+  if (ADMIN_SUPER_EMAIL) _adminSeed.add(ADMIN_SUPER_EMAIL);
+  (ENV.ADMIN_EMAILS || "").split(",").forEach((e) => {
+    e = (e || "").trim().toLowerCase();
+    if (e) _adminSeed.add(e);
+  });
+  const _insAdmin = db.prepare(
+    "INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) VALUES(?,?,datetime('now'))");
+  _adminSeed.forEach((e) => _insAdmin.run(e, "seed"));
   if (db.prepare("SELECT COUNT(*) c FROM support").get().c === 0) {
     const seeds = [
       ["SUP-204", "Meera Suresh", "Founder", "TiE membership verification",
@@ -379,21 +393,38 @@ const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID || "";
 // Add more admins via ADMIN_EMAILS (comma-separated) in .env; override the
 // super-admin via ADMIN_SUPER_EMAIL if ever needed.
 const ADMIN_SUPER_EMAIL = (ENV.ADMIN_SUPER_EMAIL || "admin.blr@tiebangalore.org").trim().toLowerCase();
-const ADMIN_EMAILS = (function () {
-  const set = new Set();
-  if (ADMIN_SUPER_EMAIL) set.add(ADMIN_SUPER_EMAIL);
-  (ENV.ADMIN_EMAILS || "").split(",").forEach(function (e) {
-    e = (e || "").trim().toLowerCase();
-    if (e) set.add(e);
-  });
-  return set;
-})();
+// ADMIN_EMAILS from .env is only a FIRST-RUN SEED. The live allow-list lives in
+// the admin_allowlist table (see db_init) so the super-admin can add/remove
+// admins from inside the portal without editing files or restarting the server.
 function admin_role_for(email) {
   email = (email || "").trim().toLowerCase();
   if (!email) return null;
   if (email === ADMIN_SUPER_EMAIL) return "super-admin";
-  if (ADMIN_EMAILS.has(email)) return "admin";
-  return null;
+  const row = db.prepare("SELECT email FROM admin_allowlist WHERE email=?").get(email);
+  return row ? "admin" : null;
+}
+function admin_list() {
+  // Super-admin always sorts to the top; everyone else alphabetically.
+  const rows = db.prepare(
+    "SELECT email, added_by, added_at FROM admin_allowlist ORDER BY (email=?) DESC, email ASC"
+  ).all(ADMIN_SUPER_EMAIL);
+  return rows.map((r) => ({
+    email: r.email,
+    role: r.email === ADMIN_SUPER_EMAIL ? "super-admin" : "admin",
+    added_by: r.added_by || "",
+    added_at: r.added_at || "",
+  }));
+}
+// Verify a Google credential and require it to be the SUPER-admin. This guards
+// the admin-management endpoints: there are no browser sessions yet, so the
+// caller proves who they are by sending their Google ID token with each request.
+async function require_super_admin(idToken) {
+  const v = await verify_google_token(idToken);
+  if (v.error) return { error: v.error, status: 401 };
+  if (admin_role_for(v.email) !== "super-admin") {
+    return { error: "Only the super-admin can manage admin access.", status: 403 };
+  }
+  return { email: v.email };
 }
 
 const CHAPTER = "TiE Bangalore";
@@ -919,6 +950,32 @@ async function handlePost(req, res, urlObj, data) {
     // founder, refresh their TiE membership, and return the profile.
     const out = await founder_google_login(data.credential || "");
     return sendJson(res, out.error ? 401 : 200, out);
+  } else if (p === "/api/admin/list") {
+    // Super-admin only: read the admin allow-list.
+    const g = await require_super_admin(data.credential || "");
+    if (g.error) return sendJson(res, g.status, { error: g.error });
+    return sendJson(res, 200, { admins: admin_list() });
+  } else if (p === "/api/admin/add") {
+    // Super-admin only: add an approved admin email.
+    const g = await require_super_admin(data.credential || "");
+    if (g.error) return sendJson(res, g.status, { error: g.error });
+    const email = (data.email || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return sendJson(res, 400, { error: "Please enter a valid email address." });
+    }
+    db.prepare("INSERT OR IGNORE INTO admin_allowlist(email, added_by, added_at) VALUES(?,?,datetime('now'))")
+      .run(email, g.email);
+    return sendJson(res, 200, { admins: admin_list() });
+  } else if (p === "/api/admin/remove") {
+    // Super-admin only: remove an admin email (the super-admin can't be removed).
+    const g = await require_super_admin(data.credential || "");
+    if (g.error) return sendJson(res, g.status, { error: g.error });
+    const email = (data.email || "").trim().toLowerCase();
+    if (email === ADMIN_SUPER_EMAIL) {
+      return sendJson(res, 400, { error: "The super-admin can’t be removed." });
+    }
+    db.prepare("DELETE FROM admin_allowlist WHERE email=?").run(email);
+    return sendJson(res, 200, { admins: admin_list() });
   } else if (p === "/api/review") {
     // A reviewer submits a verdict — this is what the founder then sees.
     const fid = data.founder_id;

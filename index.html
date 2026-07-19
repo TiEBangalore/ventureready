@@ -2975,6 +2975,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div class="admin-nav-section">Governance</div>
     <div class="admin-nav-item" onclick="showAdminPage('complaints',this)"><span class="icon">⚠️</span>Complaint Log</div>
     <div class="admin-nav-item" onclick="showAdminPage('rubric',this)"><span class="icon">📐</span>Rubric & Calibration</div>
+    <div class="admin-nav-section" id="nav-section-settings" style="display:none;">Settings</div>
+    <div class="admin-nav-item" id="nav-admin-access" style="display:none;" onclick="showAdminPage('access',this)"><span class="icon">🔑</span>Admin Access</div>
     <div style="margin-top:auto;padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);">
       <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:8px;">Signed in as</div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -3216,6 +3218,35 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <tr><td>Narendra Bhandari</td><td>3</td><td>0</td><td>—</td><td><span class="badge badge-pending">Needs spot-check</span></td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div id="admin-access" class="admin-page">
+      <div class="admin-page-hd">
+        <h1>Admin Access</h1>
+        <p>Who can sign in to this Team Portal. Access is an explicit allow-list — only the emails below can enter, verified by Google sign-in. The whole @tiebangalore.org domain is <strong>not</strong> automatically admitted. Only the super-admin can make changes here.</p>
+      </div>
+      <div id="admin-access-guard" style="display:none;" class="admin-card">
+        <div style="padding:6px 2px;font-size:13px;color:var(--mid);">Only the super-admin (<strong>admin.blr@tiebangalore.org</strong>) can manage admin access. If you need a teammate added, please ask them.</div>
+      </div>
+      <div id="admin-access-main">
+        <div class="admin-card" style="margin-bottom:20px;">
+          <div class="admin-card-hd">Add an approved admin <span>They sign in with their Google account; only listed emails can enter</span></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:6px 2px;flex-wrap:wrap;">
+            <input id="admin-add-email" type="email" placeholder="name@tiebangalore.org" style="flex:1;min-width:240px;padding:9px 11px;border:1px solid var(--line,#D9DEE6);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter')addAdmin()" />
+            <button class="btn btn-dark" onclick="addAdmin()" style="font-size:12px;white-space:nowrap;">+ Add admin</button>
+          </div>
+          <div id="admin-access-msg" style="display:none;font-size:12px;margin:8px 2px 0;"></div>
+        </div>
+        <div class="admin-card">
+          <div class="admin-card-hd">Approved admins <span id="admin-count-label"></span></div>
+          <table class="admin-table">
+            <thead><tr><th>Email</th><th>Role</th><th>Added by</th><th style="text-align:right;">Action</th></tr></thead>
+            <tbody id="admin-access-tbody">
+              <tr><td colspan="4" style="color:var(--mid);">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -3676,6 +3707,7 @@ function showAdminPage(page, el){
   if(target) target.classList.add('active');
   if(el) el.classList.add('active');
   if(page==='support' && typeof loadSupport==='function') loadSupport();
+  if(page==='access' && typeof loadAdmins==='function') loadAdmins();
 }
 function handleNdaContinue(){
   const isFree = document.getElementById('memberToggle').value === 'free';
@@ -4711,6 +4743,9 @@ async function handleGoogleCredential(response){
         _authErr(errId, 'This Google account isn’t on the VentureReady admin allow-list. To request access, email admin.blr@tiebangalore.org.');
         return;
       }
+      // Keep the verified Google token in memory for this session so the
+      // super-admin can call the admin-management endpoints (no cookies yet).
+      window.__adminCred = (response && response.credential) || '';
       _applyAdmin(out);
       return;
     }
@@ -4735,8 +4770,89 @@ function _applyAdmin(out){
       var initials=((parts[0]||'')[0]||'')+((parts[1]||'')[0]||'');
       avEl.textContent=(initials||em[0]||'A').toUpperCase();
     }
+    // Only the super-admin sees the "Admin Access" management page.
+    window.__adminRole = out.role || '';
+    var isSuper = (out.role==='super-admin');
+    var navA=document.getElementById('nav-admin-access');
+    var navS=document.getElementById('nav-section-settings');
+    if(navA) navA.style.display = isSuper ? '' : 'none';
+    if(navS) navS.style.display = isSuper ? '' : 'none';
   }catch(e){}
   loggedInAs='admin'; goAdmin('dashboard');
+}
+
+// ── Admin Access management (super-admin only) ──────────────────────────────
+function _adminAccessMsg(msg, ok){
+  var el=document.getElementById('admin-access-msg');
+  if(!el) return;
+  el.textContent=msg||'';
+  el.style.display=msg?'':'none';
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+}
+function _renderAdmins(admins){
+  var tb=document.getElementById('admin-access-tbody');
+  var lbl=document.getElementById('admin-count-label');
+  if(lbl) lbl.textContent = admins.length + (admins.length===1?' person':' people');
+  if(!tb) return;
+  tb.innerHTML='';
+  admins.forEach(function(a){
+    var isSuper=(a.role==='super-admin');
+    var tr=document.createElement('tr');
+    var roleBadge = isSuper
+      ? '<span class="badge badge-active">Super-admin</span>'
+      : '<span class="badge badge-pending">Admin</span>';
+    var action = isSuper
+      ? '<span style="color:var(--mid);font-size:11px;">Cannot be removed</span>'
+      : '<button class="btn-xs btn-xs-red" onclick="removeAdmin(\''+a.email.replace(/'/g,"\\'")+'\')">Remove</button>';
+    tr.innerHTML='<td>'+a.email+'</td><td>'+roleBadge+'</td><td style="color:var(--mid);">'+(a.added_by||'—')+'</td><td style="text-align:right;">'+action+'</td>';
+    tb.appendChild(tr);
+  });
+}
+async function loadAdmins(){
+  var guard=document.getElementById('admin-access-guard');
+  var main=document.getElementById('admin-access-main');
+  // Real management needs the super-admin's Google token from this session.
+  if(window.__adminRole!=='super-admin' || !window.__adminCred){
+    if(guard) guard.style.display='';
+    if(main) main.style.display='none';
+    return;
+  }
+  if(guard) guard.style.display='none';
+  if(main) main.style.display='';
+  _adminAccessMsg('');
+  try{
+    var r=await fetch('/api/admin/list',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ _adminAccessMsg(out.error); return; }
+    _renderAdmins(out.admins||[]);
+  }catch(e){ _adminAccessMsg('Could not reach the server. Please try again.'); }
+}
+async function addAdmin(){
+  var inp=document.getElementById('admin-add-email');
+  var email=(inp&&inp.value||'').trim();
+  if(!email){ _adminAccessMsg('Please enter an email address.'); return; }
+  _adminAccessMsg('');
+  try{
+    var r=await fetch('/api/admin/add',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, email:email})});
+    var out=await r.json();
+    if(out.error){ _adminAccessMsg(out.error); return; }
+    if(inp) inp.value='';
+    _renderAdmins(out.admins||[]);
+    _adminAccessMsg('Added '+email+'. They can now sign in with Google.', true);
+  }catch(e){ _adminAccessMsg('Could not reach the server. Please try again.'); }
+}
+async function removeAdmin(email){
+  _adminAccessMsg('');
+  try{
+    var r=await fetch('/api/admin/remove',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, email:email})});
+    var out=await r.json();
+    if(out.error){ _adminAccessMsg(out.error); return; }
+    _renderAdmins(out.admins||[]);
+    _adminAccessMsg('Removed '+email+'.', true);
+  }catch(e){ _adminAccessMsg('Could not reach the server. Please try again.'); }
 }
 
 // Founder demo fallback used only when NO Google Client ID is configured.
@@ -4748,7 +4864,13 @@ function googleSignIn(){
 }
 
 // Admin demo fallback used only when NO Google Client ID is configured.
+// Demo has no verified identity, so admin-management stays locked/hidden.
 function adminDemoSignIn(){
+  window.__adminRole=''; window.__adminCred='';
+  var navA=document.getElementById('nav-admin-access');
+  var navS=document.getElementById('nav-section-settings');
+  if(navA) navA.style.display='none';
+  if(navS) navS.style.display='none';
   loggedInAs='admin'; goAdmin('dashboard');
 }
 
