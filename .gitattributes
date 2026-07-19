@@ -1,0 +1,3 @@
+# Keep the old Python backend as a reference, but don't let it count toward
+# the repository's language statistics — the app now runs on Node.js (server.js).
+server.py linguist-generated=true
