@@ -1668,44 +1668,45 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <div class="form-group">
       <label>Full name</label>
-      <input type="text" placeholder="Your name" />
+      <input type="text" id="inv-name" placeholder="Your name" />
     </div>
     <div class="upload-grid">
       <div class="form-group">
         <label>Email address</label>
-        <input type="email" placeholder="you@fund.com" />
+        <input type="email" id="inv-email" placeholder="you@fund.com" />
       </div>
       <div class="form-group">
         <label>Firm / fund name</label>
-        <input type="text" placeholder="e.g. Orbit Ventures" />
+        <input type="text" id="inv-firm" placeholder="e.g. Orbit Ventures" />
       </div>
     </div>
     <div class="upload-grid">
       <div class="form-group">
         <label>Your TiE Bangalore status</label>
-        <select><option>Charter Member</option><option>Other TiE Member</option><option selected>Not a TiE Member</option></select>
+        <select id="inv-tie"><option>Charter Member</option><option>Other TiE Member</option><option selected>Not a TiE Member</option></select>
       </div>
       <div class="form-group">
         <label>Typical cheque size</label>
-        <input type="text" placeholder="e.g. ₹25L – ₹2 Cr" />
+        <input type="text" id="inv-cheque" placeholder="e.g. ₹25L – ₹2 Cr" />
       </div>
     </div>
     <div class="form-group">
       <label>Sectors &amp; stage focus</label>
-      <input type="text" placeholder="e.g. B2B SaaS, Seed–Series A" />
+      <input type="text" id="inv-focus" placeholder="e.g. B2B SaaS, Seed–Series A" />
     </div>
     <div class="form-group">
       <label>Track record <span style="font-weight:400;text-transform:none;letter-spacing:0">(LinkedIn, fund page, or notable investments)</span></label>
-      <input type="text" placeholder="https://" />
+      <input type="text" id="inv-track" placeholder="https://" />
     </div>
     <div class="form-group">
       <label>Recent investments <span style="font-weight:400;text-transform:none;letter-spacing:0">— at least 3: company name, sector, stage, and year</span></label>
-      <textarea rows="5" placeholder="e.g. Stackr — B2B SaaS, Seed, 2024&#10;Ferra Health — Healthtech, Pre-seed, 2023&#10;Loopwise — Fintech, Series A, 2022"></textarea>
+      <textarea rows="5" id="inv-recent" placeholder="e.g. Stackr — B2B SaaS, Seed, 2024&#10;Ferra Health — Healthtech, Pre-seed, 2023&#10;Loopwise — Fintech, Series A, 2022"></textarea>
     </div>
+    <div id="inv-apply-msg" style="display:none;font-size:13px;margin-bottom:12px;"></div>
 
     <div class="upload-actions">
       <button class="btn btn-outline" onclick="go('home')">← Back</button>
-      <button class="btn btn-red btn-lg" onclick="go('investor-pending')">Submit Application →</button>
+      <button class="btn btn-red btn-lg" onclick="submitInvestorApplication(this)">Submit Application →</button>
     </div>
   </div>
   <div class="dark-footer">
@@ -1798,26 +1799,27 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <div class="invite-hd"><div class="invite-num">1</div><div style="font-size:13px;font-weight:700;">User 1</div></div>
     <div class="invite-row">
-      <div class="form-group" style="margin-bottom:0"><label>Name</label><input type="text" placeholder="Full name" /></div>
-      <div class="form-group" style="margin-bottom:0"><label>Email</label><input type="email" placeholder="name@firm.com" /></div>
+      <div class="form-group" style="margin-bottom:0"><label>Name</label><input type="text" id="inv-u1-name" placeholder="Full name" /></div>
+      <div class="form-group" style="margin-bottom:0"><label>Email</label><input type="email" id="inv-u1-email" placeholder="name@firm.com" /></div>
       <div></div>
     </div>
     <div class="invite-hd"><div class="invite-num">2</div><div style="font-size:13px;font-weight:700;">User 2</div></div>
     <div class="invite-row">
-      <div class="form-group" style="margin-bottom:0"><label>Name</label><input type="text" placeholder="Full name" /></div>
-      <div class="form-group" style="margin-bottom:0"><label>Email</label><input type="email" placeholder="name@firm.com" /></div>
+      <div class="form-group" style="margin-bottom:0"><label>Name</label><input type="text" id="inv-u2-name" placeholder="Full name" /></div>
+      <div class="form-group" style="margin-bottom:0"><label>Email</label><input type="email" id="inv-u2-email" placeholder="name@firm.com" /></div>
       <div></div>
     </div>
     <div class="invite-hd"><div class="invite-num">3</div><div style="font-size:13px;font-weight:700;">User 3</div></div>
     <div class="invite-row">
-      <div class="form-group" style="margin-bottom:0"><label>Name</label><input type="text" placeholder="Full name" /></div>
-      <div class="form-group" style="margin-bottom:0"><label>Email</label><input type="email" placeholder="name@firm.com" /></div>
+      <div class="form-group" style="margin-bottom:0"><label>Name</label><input type="text" id="inv-u3-name" placeholder="Full name" /></div>
+      <div class="form-group" style="margin-bottom:0"><label>Email</label><input type="email" id="inv-u3-email" placeholder="name@firm.com" /></div>
       <div></div>
     </div>
+    <div id="inv-invite-msg" style="display:none;font-size:13px;margin-top:12px;"></div>
 
     <div class="upload-actions">
       <button class="btn btn-outline" onclick="go('investor-dealflow')">Skip for now</button>
-      <button class="btn btn-red btn-lg" onclick="go('investor-dealflow')">Send Invites &amp; Continue →</button>
+      <button class="btn btn-red btn-lg" onclick="submitInvestorInvites(this)">Send Invites &amp; Continue →</button>
     </div>
   </div>
 </div>
@@ -1980,7 +1982,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     tiers:['Tier 2 ✓','Tier 2 ✓','Tier 2 ✓','Tier 2 ✓']
   };
   function openFounderProfile(card){
-    function t(sel){ var el=card.querySelector(sel); return el?el.textContent.trim():''; }
+    // Read the card's text WITHOUT the little "Sample" chip that marks
+    // illustrative entries — it's a label, not part of the company name.
+    function t(sel){
+      var el=card.querySelector(sel); if(!el) return '';
+      var c=el.cloneNode(true);
+      c.querySelectorAll('.sample-chip').forEach(function(s){ s.remove(); });
+      return c.textContent.trim();
+    }
     var co=t('.deal-co'), meta=t('.deal-meta');
     // Optional founder sub-line sits right after the meta line on the card.
     var founderLine='', metaEl=card.querySelector('.deal-meta');
@@ -2062,7 +2071,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <button class="btn btn-outline btn-lg" onclick="openDeck('investor-profile','NDA-signed investor')">🔒 View pitch deck</button>
         <button class="btn btn-outline btn-lg" onclick="go('investor-dataroom')">🔒 Open data room</button>
         <button class="btn btn-outline btn-lg" onclick="downloadFeedbackPDF('investor')">⬇ Download feedback (PDF)</button>
-        <button class="btn btn-red btn-lg" onclick="go('investor-meeting-sent')">Request Meeting via TiE →</button>
+        <button class="btn btn-red btn-lg" onclick="requestMeeting(this)">Request Meeting via TiE →</button>
       </div>
     </div>
   </div>
@@ -3037,7 +3046,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <h1>Investor Applications</h1>
         <p>Review each application individually before granting deal-flow access. Charter membership does not bypass this gate.</p>
       </div>
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;">Live applications — real submissions</div>
+          <button class="btn-xs" onclick="loadInvestors()">Refresh</button>
+        </div>
+        <div id="admin-investors-live"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+      </div>
       <div class="admin-card">
+        <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample applications (illustrative)</div>
         <table class="admin-table">
           <thead><tr><th>Investor</th><th>Firm</th><th>TiE Status</th><th>Portfolio submitted</th><th>Applied</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
@@ -3056,7 +3073,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <h1>Meeting Requests</h1>
         <p>All founder–investor introductions are facilitated by TiE. No direct messaging between parties. Mark each intro as sent once done.</p>
       </div>
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;">Live requests — real introductions to make</div>
+          <button class="btn-xs" onclick="loadMeetings()">Refresh</button>
+        </div>
+        <div id="admin-meetings-live"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+      </div>
       <div class="admin-card">
+        <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample requests (illustrative)</div>
         <table class="admin-table">
           <thead><tr><th>Founder</th><th>Startup</th><th>Investor</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
@@ -3076,7 +3101,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <h1>Review Assignment</h1>
         <p>Assign incoming questionnaires to the right TiE Charter Member reviewer. Target SLA: 3–5 business days.</p>
       </div>
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;">Live queue — real founders who submitted a deck</div>
+          <button class="btn-xs" onclick="loadReviewQueue()">Refresh</button>
+        </div>
+        <div id="admin-review-live"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+      </div>
       <div class="admin-card">
+        <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample queue (illustrative)</div>
         <table class="admin-table">
           <thead><tr><th>Founder</th><th>Startup · Sector · Stage</th><th>Submitted</th><th>SLA</th><th>Assigned to</th><th>Action</th></tr></thead>
           <tbody>
@@ -3582,7 +3615,23 @@ function goPay(name, amount, period, next){
   document.getElementById('payBtn').textContent = 'Pay ' + amount + ' & Activate →';
   go('payment');
 }
-function completePayment(){ go(paymentCtx.next); }
+function completePayment(){
+  // Record the payment as a real row (drives the receipt + admin notification).
+  // No card data is sent or stored — only what was purchased.
+  try{
+    var body = {
+      item: (paymentCtx && paymentCtx.name) || '',
+      amount: (paymentCtx && paymentCtx.amount) || '',
+      period: (paymentCtx && paymentCtx.period || '').trim(),
+      founder_id: window._founderId || null,
+      payer_email: window._founderEmail || '',
+      payer_name: window._founderName || ''
+    };
+    fetch('/api/payment/record', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)}).catch(function(){});
+  }catch(e){}
+  go(paymentCtx.next);
+}
 function switchPay(idx, el){
   document.querySelectorAll('.pay-method').forEach(m=>m.classList.remove('active'));
   document.querySelectorAll('.pay-panel').forEach(p=>p.classList.remove('active'));
@@ -3718,6 +3767,9 @@ function showAdminPage(page, el){
   if(page==='support' && typeof loadSupport==='function') loadSupport();
   if(page==='access' && typeof loadAdmins==='function') loadAdmins();
   if(page==='notifications' && typeof loadNotifications==='function') loadNotifications();
+  if(page==='reviews' && typeof loadReviewQueue==='function') loadReviewQueue();
+  if(page==='applications' && typeof loadInvestors==='function') loadInvestors();
+  if(page==='meetings' && typeof loadMeetings==='function') loadMeetings();
 }
 function handleNdaContinue(){
   const isFree = document.getElementById('memberToggle').value === 'free';
@@ -4545,6 +4597,8 @@ function authTab(which){
 function _applyFounder(rec){
   if(!rec || rec.error) return;
   window._founderId = rec.id;
+  window._founderEmail = rec.email || '';
+  window._founderName = rec.name || '';
   try{ localStorage.setItem('vr_founder_id', String(rec.id)); }catch(e){}
   var name = rec.name || 'New Founder';
   var parts = name.split(/\s+/);
@@ -4916,6 +4970,249 @@ function _renderNotifications(items){
       '<div style="font-size:11px;color:var(--mid);margin-top:3px;">to '+_escapeHtml(n.recipient||'')+' · '+_escapeHtml(n.created_at||'')+' · '+statusTxt+'</div></div></div>';
   });
   live.innerHTML=html;
+}
+
+// ---- Live review-assignment queue (real founders who submitted a deck) ----
+async function loadReviewQueue(){
+  var live=document.getElementById('admin-review-live');
+  if(!live) return;
+  if(!window.__adminCred){
+    live.innerHTML='<div style="font-size:12px;color:var(--mid);">Sign in with a Google admin account to see and assign the live review queue.</div>';
+    return;
+  }
+  live.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading…</p>';
+  try{
+    var r=await fetch('/api/admin/review-queue',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ live.innerHTML='<div style="font-size:12px;color:var(--red);">'+_escapeHtml(out.error)+'</div>'; return; }
+    _renderReviewQueue(out.queue||[]);
+  }catch(e){ live.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+function _renderReviewQueue(rows){
+  var live=document.getElementById('admin-review-live');
+  if(!live) return;
+  if(!rows.length){
+    live.innerHTML='<div style="font-size:12px;color:var(--mid);">No real submissions yet. When a founder uploads a deck, they appear here for assignment.</div>';
+    return;
+  }
+  var html='<table class="admin-table"><thead><tr><th>Founder</th><th>Startup · Sector · Stage</th><th>Last deck</th><th>Assigned to</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(function(q){
+    var assigned = q.reviewer_email ? (_escapeHtml(q.reviewer_name||q.reviewer_email)+'<br><span style="font-size:11px;color:var(--grey);">'+_escapeHtml(q.reviewer_email)+'</span>') : '<span style="color:var(--red);">Unassigned</span>';
+    var btnLabel = q.reviewer_email ? 'Reassign' : 'Assign';
+    html+='<tr><td><strong>'+_escapeHtml(q.name||'—')+'</strong></td>'+
+      '<td>'+_escapeHtml((q.company||'')+' · '+(q.sector||'')+' · '+(q.stage||''))+'</td>'+
+      '<td>'+_escapeHtml((q.last_deck||'').split(' ')[0])+'</td>'+
+      '<td>'+assigned+'</td>'+
+      '<td class="action-btns"><button class="btn-xs btn-xs-outline" onclick="assignReviewer('+q.founder_id+',this)">'+btnLabel+'</button></td></tr>';
+  });
+  html+='</tbody></table>';
+  live.innerHTML=html;
+}
+async function assignReviewer(founderId, btn){
+  if(!window.__adminCred){ alert('Sign in with a Google admin account first.'); return; }
+  var email=prompt('Reviewer email to assign this founder to (they will be notified):');
+  if(!email) return;
+  var name=prompt('Reviewer name (optional):','')||'';
+  if(btn){ btn.disabled=true; btn.textContent='Assigning…'; }
+  try{
+    var r=await fetch('/api/review/assign',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, founder_id:founderId, reviewer_email:email, reviewer_name:name})});
+    var out=await r.json();
+    if(out.error){ alert(out.error); if(btn){ btn.disabled=false; btn.textContent='Assign'; } return; }
+    _renderReviewQueue(out.queue||[]);
+  }catch(e){ alert('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Assign'; } }
+}
+
+// ---- Investor application (real saved record + admin notification) --------
+function _v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+async function submitInvestorApplication(btn){
+  var msg=document.getElementById('inv-apply-msg');
+  function show(t, ok){ if(!msg) return; msg.style.display=''; msg.style.color= ok?'var(--green)':'var(--red)'; msg.textContent=t; }
+  var body={ name:_v('inv-name'), email:_v('inv-email'), firm:_v('inv-firm'),
+    tie_status:_v('inv-tie'), cheque_size:_v('inv-cheque'), focus:_v('inv-focus'),
+    track_record:_v('inv-track'), recent_investments:_v('inv-recent') };
+  if(!body.name){ show('Please enter your full name.'); return; }
+  if(!body.email){ show('Please enter your email address.'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='Submitting…'; }
+  try{
+    var r=await fetch('/api/investor/apply',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    var out=await r.json();
+    if(out.error){ show(out.error); if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; } return; }
+    window._investorId=out.investor.id; window._investorEmail=out.investor.email;
+    window._investorName=out.investor.name; window._investorFirm=out.investor.firm;
+    if(msg) msg.style.display='none';
+    if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; }
+    go('investor-pending');
+  }catch(e){ show('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; } }
+}
+
+// ---- Live investor applications (admin approve / reject) ------------------
+async function loadInvestors(){
+  var live=document.getElementById('admin-investors-live');
+  if(!live) return;
+  if(!window.__adminCred){
+    live.innerHTML='<div style="font-size:12px;color:var(--mid);">Sign in with a Google admin account to see and decide real investor applications.</div>';
+    return;
+  }
+  live.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading…</p>';
+  try{
+    var r=await fetch('/api/admin/investors',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ live.innerHTML='<div style="font-size:12px;color:var(--red);">'+_escapeHtml(out.error)+'</div>'; return; }
+    _renderInvestors(out.investors||[]);
+  }catch(e){ live.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+function _renderInvestors(rows){
+  var live=document.getElementById('admin-investors-live');
+  if(!live) return;
+  if(!rows.length){
+    live.innerHTML='<div style="font-size:12px;color:var(--mid);">No real investor applications yet. Submissions from the "Apply as Investor" form appear here.</div>';
+    return;
+  }
+  var badge={pending:'badge-pending',approved:'badge-approved',rejected:'badge-overdue',invited:'badge-review'};
+  var html='<table class="admin-table"><thead><tr><th>Investor</th><th>Firm</th><th>TiE Status</th><th>Focus</th><th>Applied</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(function(i){
+    var isTeam = !!i.parent_investor_id;
+    var act='';
+    if(i.status==='pending'){
+      act='<button class="btn-xs btn-xs-green" onclick="decideInvestor('+i.id+',\'approved\',this)">Approve</button>'+
+          '<button class="btn-xs btn-xs-outline" onclick="decideInvestor('+i.id+',\'rejected\',this)">Reject</button>';
+    }else{
+      act='<span style="font-size:11px;color:var(--grey);">'+_escapeHtml(i.status)+(i.decided_by?(' by '+i.decided_by):'')+'</span>';
+    }
+    html+='<tr><td><strong>'+_escapeHtml(i.name||'—')+'</strong>'+(isTeam?' <span style="font-size:10px;color:var(--grey);">(team seat)</span>':'')+
+      '<br><span style="font-size:11px;color:var(--grey);">'+_escapeHtml(i.email)+'</span></td>'+
+      '<td>'+_escapeHtml(i.firm||'—')+'</td>'+
+      '<td>'+_escapeHtml(i.tie_status||'—')+'</td>'+
+      '<td>'+_escapeHtml(i.focus||'—')+'</td>'+
+      '<td>'+_escapeHtml((i.created_at||'').split(' ')[0])+'</td>'+
+      '<td><span class="badge '+(badge[i.status]||'badge-pending')+'">'+_escapeHtml(i.status)+'</span></td>'+
+      '<td class="action-btns">'+act+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  live.innerHTML=html;
+}
+async function decideInvestor(investorId, decision, btn){
+  if(!window.__adminCred){ alert('Sign in with a Google admin account first.'); return; }
+  var reason='';
+  if(decision==='rejected'){
+    reason=prompt('Reason for declining (recorded; a short note is included in the email to them):')||'';
+  }else{
+    if(!confirm('Approve this investor for screened deal-flow access?\n\nThey still cannot see deal flow until their NDA is executed.')) return;
+  }
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    var r=await fetch('/api/investor/decision',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, investor_id:investorId, decision:decision, reason:reason})});
+    var out=await r.json();
+    if(out.error){ alert(out.error); if(btn){ btn.disabled=false; btn.textContent=(decision==='approved'?'Approve':'Reject'); } return; }
+    _renderInvestors(out.investors||[]);
+  }catch(e){ alert('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; } }
+}
+
+// ---- Investor team invites (each seat is its own real record) -------------
+async function submitInvestorInvites(btn){
+  var msg=document.getElementById('inv-invite-msg');
+  function show(t, ok){ if(!msg) return; msg.style.display=''; msg.style.color= ok?'var(--green)':'var(--red)'; msg.innerHTML=t; }
+  if(!window._investorEmail){
+    show('We don\'t know which investor account these seats belong to. Please submit the investor application first — then your invites can be saved against your firm.');
+    return;
+  }
+  var users=[];
+  [1,2,3].forEach(function(n){
+    var e=_v('inv-u'+n+'-email'); if(e) users.push({name:_v('inv-u'+n+'-name'), email:e});
+  });
+  if(!users.length){ go('investor-dealflow'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try{
+    var r=await fetch('/api/investor/invite',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({inviter_email:window._investorEmail, users:users})});
+    var out=await r.json();
+    if(btn){ btn.disabled=false; btn.textContent='Send Invites & Continue →'; }
+    if(out.error){ show(out.error); return; }
+    if(out.skipped && out.skipped.length){
+      var lines=out.skipped.map(function(s){ return _escapeHtml(s.email)+' — '+_escapeHtml(s.why); });
+      show('Added '+(out.added||[]).length+'. Not added: <br>'+lines.join('<br>'));
+      return;   // stay on the page so they can correct it
+    }
+    go('investor-dealflow');
+  }catch(e){ show('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Send Invites & Continue →'; } }
+}
+
+// ---- Meeting requests (TiE facilitates every introduction) ----------------
+async function requestMeeting(btn){
+  function T(id){ var el=document.getElementById(id); return el?el.textContent.trim():''; }
+  var startup=T('prof-co');
+  var founderLine=T('prof-founder');
+  var founderName=founderLine.split('·')[0].trim();
+  if(btn){ btn.disabled=true; btn.textContent='Requesting…'; }
+  try{
+    var r=await fetch('/api/meeting/request',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_name:founderName, startup:startup,
+        investor_email:window._investorEmail||'', investor_name:window._investorName||''})});
+    var out=await r.json();
+    if(btn){ btn.disabled=false; btn.textContent='Request Meeting via TiE →'; }
+    if(out.error){ alert(out.error); return; }
+    go('investor-meeting-sent');
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Request Meeting via TiE →'; }
+    alert('Could not reach the server. Please try again.'); }
+}
+
+// ---- Live meeting requests (admin marks each intro as sent) ---------------
+async function loadMeetings(){
+  var live=document.getElementById('admin-meetings-live');
+  if(!live) return;
+  if(!window.__adminCred){
+    live.innerHTML='<div style="font-size:12px;color:var(--mid);">Sign in with a Google admin account to see and action real meeting requests.</div>';
+    return;
+  }
+  live.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading…</p>';
+  try{
+    var r=await fetch('/api/admin/meetings',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ live.innerHTML='<div style="font-size:12px;color:var(--red);">'+_escapeHtml(out.error)+'</div>'; return; }
+    _renderMeetings(out.meetings||[]);
+  }catch(e){ live.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+function _renderMeetings(rows){
+  var live=document.getElementById('admin-meetings-live');
+  if(!live) return;
+  if(!rows.length){
+    live.innerHTML='<div style="font-size:12px;color:var(--mid);">No real meeting requests yet. When an investor requests an introduction, it appears here.</div>';
+    return;
+  }
+  var badge={requested:'badge-pending',intro_sent:'badge-review',held:'badge-done',declined:'badge-overdue'};
+  var html='<table class="admin-table"><thead><tr><th>Founder</th><th>Startup</th><th>Investor</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(function(m){
+    var act = (m.status==='requested')
+      ? '<button class="btn-xs btn-xs-green" onclick="markIntroSent('+m.id+',this)">Mark Intro Sent</button>'
+      : '<span style="font-size:11px;color:var(--grey);">'+_escapeHtml((m.intro_sent_at||'').split(' ')[0]||m.status)+'</span>';
+    html+='<tr><td><strong>'+_escapeHtml(m.founder_name||'—')+'</strong></td>'+
+      '<td>'+_escapeHtml(m.startup||'—')+'</td>'+
+      '<td>'+_escapeHtml(m.investor_name||m.investor_email||'—')+
+        (m.investor_email?'<br><span style="font-size:11px;color:var(--grey);">'+_escapeHtml(m.investor_email)+'</span>':'')+'</td>'+
+      '<td>'+_escapeHtml((m.requested_at||'').split(' ')[0])+'</td>'+
+      '<td><span class="badge '+(badge[m.status]||'badge-pending')+'">'+_escapeHtml(m.status.replace('_',' '))+'</span></td>'+
+      '<td class="action-btns">'+act+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  live.innerHTML=html;
+}
+async function markIntroSent(meetingId, btn){
+  if(!window.__adminCred){ alert('Sign in with a Google admin account first.'); return; }
+  if(!confirm('Mark this introduction as sent?\n\nBoth the founder and the investor will be notified.')) return;
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    var r=await fetch('/api/meeting/intro-sent',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, meeting_id:meetingId})});
+    var out=await r.json();
+    if(out.error){ alert(out.error); if(btn){ btn.disabled=false; btn.textContent='Mark Intro Sent'; } return; }
+    _renderMeetings(out.meetings||[]);
+  }catch(e){ alert('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Mark Intro Sent'; } }
 }
 
 // Founder demo fallback used only when NO Google Client ID is configured.

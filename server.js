@@ -112,6 +112,35 @@ function db_init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, notification_id INTEGER, to_email TEXT,
       subject TEXT, body TEXT, status TEXT DEFAULT 'pending', error TEXT,
       created_at TEXT, sent_at TEXT)`);
+  // Payments: a real row every time a founder/investor pays for something
+  // (membership, expert review, deal-flow access). No card data is stored —
+  // this is the prototype record that drives the receipt notification.
+  db.exec(`CREATE TABLE IF NOT EXISTS payment(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, payer_email TEXT, payer_name TEXT,
+      founder_id INTEGER, item TEXT, amount TEXT, period TEXT,
+      status TEXT DEFAULT 'paid', created_at TEXT)`);
+  // Review assignment: which reviewer is responsible for a founder's review,
+  // who assigned it, and the SLA target. One row per assignment/reassignment.
+  db.exec(`CREATE TABLE IF NOT EXISTS review_assignment(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
+      reviewer_email TEXT, reviewer_name TEXT, assigned_by TEXT,
+      status TEXT DEFAULT 'assigned', sla_due TEXT, created_at TEXT)`);
+  // Investors: real screened-access records. A primary applicant is a row with
+  // parent_investor_id = NULL; each firm team-mate they invite is a row that
+  // points back to the primary via parent_investor_id. status walks:
+  // 'pending' -> 'approved' | 'rejected'; invited team-mates start 'invited'.
+  db.exec(`CREATE TABLE IF NOT EXISTS investor(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, firm TEXT,
+      tie_status TEXT, cheque_size TEXT, focus TEXT, track_record TEXT,
+      recent_investments TEXT, status TEXT DEFAULT 'pending', parent_investor_id INTEGER,
+      decided_by TEXT, decided_at TEXT, created_at TEXT)`);
+  // Meeting requests: an investor asks TiE to introduce them to a founder.
+  // TiE facilitates every intro (no direct messaging). status walks:
+  // 'requested' -> 'intro_sent' -> 'held' | 'declined'.
+  db.exec(`CREATE TABLE IF NOT EXISTS meeting(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
+      startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
+      status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)`);
   if (db.prepare("SELECT COUNT(*) c FROM support").get().c === 0) {
     const seeds = [
       ["SUP-204", "Meera Suresh", "Founder", "TiE membership verification",
@@ -578,6 +607,338 @@ function notifications_recent(limit) {
     body: r.body, urgency: r.urgency || "normal", created_at: r.created_at || "",
     status: r.status || "pending",
   }));
+}
+
+// ---- Payments (real records + receipt notification) -----------------------
+function payment_record(d) {
+  // Record a payment. No card details are ever stored — only what was bought.
+  // Fires a receipt to the payer and a heads-up to admins.
+  let payer_email = (d.payer_email || "").trim().toLowerCase();
+  let payer_name = (d.payer_name || "").trim();
+  const founder_id = d.founder_id;
+  const item = (d.item || "").trim();
+  const amount = (d.amount || "").trim();
+  const period = (d.period || "").trim();
+  // Fall back to the logged-in founder's email if the caller didn't send one.
+  if (!payer_email && founder_id) {
+    const fb = _founder_brief(founder_id);
+    payer_email = (fb.email || "").trim().toLowerCase();
+    payer_name = payer_name || fb.name || "";
+  }
+  // Don't record an empty shell of a payment — we need at least what was
+  // bought, or someone to attribute it to.
+  if (!item && !payer_email) {
+    return { error: "A payment needs at least an item or a payer.", status: 400 };
+  }
+  const cur = db.prepare(
+    "INSERT INTO payment(payer_email, payer_name, founder_id, item, amount, period, " +
+    "status, created_at) VALUES(?,?,?,?,?,?, 'paid', datetime('now'))"
+  ).run(payer_email, payer_name, founder_id, item, amount, period);
+  const pid = cur.lastInsertRowid;
+  const row = db.prepare("SELECT * FROM payment WHERE id=?").get(pid);
+  const amt_str = (amount + (period ? " " + period : "")).trim();
+  if (payer_email) {
+    notify("payment_receipt", [payer_email],
+      "Your VentureReady payment receipt",
+      "We've received your payment of " + (amt_str || "your fee") + " for " +
+      (item || "VentureReady access") + ". Thank you — your access is now active.",
+      "normal");
+  }
+  notify("payment_received", ["admins"],
+    "Payment received: " + (item || "VentureReady access"),
+    (payer_name || payer_email || "A user") + " paid " + (amt_str || "a fee") +
+    " for " + (item || "VentureReady access") + ".", "normal");
+  return { payment: row };
+}
+
+// ---- Reviewer assignment (real records + reviewer notification) -----------
+function review_queue() {
+  // Founders who have submitted at least one deck are candidates for review.
+  // For each, show their most recent reviewer assignment (if any).
+  const rows = db.prepare(
+    "SELECT f.id, f.name, f.company, f.stage, f.sector, " +
+    "  (SELECT MAX(uploaded_at) FROM deck d WHERE d.founder_id=f.id) AS last_deck, " +
+    "  (SELECT COUNT(*) FROM deck d WHERE d.founder_id=f.id) AS deck_count " +
+    "FROM founder f " +
+    "WHERE (SELECT COUNT(*) FROM deck d WHERE d.founder_id=f.id) > 0 " +
+    "ORDER BY last_deck DESC").all();
+  const aStmt = db.prepare(
+    "SELECT reviewer_email, reviewer_name, status, created_at FROM review_assignment " +
+    "WHERE founder_id=? ORDER BY id DESC LIMIT 1");
+  return rows.map((r) => {
+    const a = aStmt.get(r.id);
+    return {
+      founder_id: r.id, name: r.name || "", company: r.company || "",
+      stage: r.stage || "", sector: r.sector || "",
+      last_deck: r.last_deck || "", deck_count: r.deck_count || 0,
+      reviewer_email: a ? a.reviewer_email : "", reviewer_name: a ? a.reviewer_name : "",
+      assignment_status: a ? a.status : "",
+    };
+  });
+}
+
+async function review_assign(idToken, founder_id, reviewer_email, reviewer_name) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  reviewer_email = (reviewer_email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(reviewer_email)) {
+    return { error: "Please enter a valid reviewer email address.", status: 400 };
+  }
+  const fb = _founder_brief(founder_id);
+  if (!fb.email && !fb.name) return { error: "Unknown founder.", status: 404 };
+  reviewer_name = (reviewer_name || "").trim() || reviewer_email.split("@")[0];
+  const prior = db.prepare("SELECT COUNT(*) c FROM review_assignment WHERE founder_id=?").get(founder_id).c;
+  const status = prior ? "reassigned" : "assigned";
+  db.prepare(
+    "INSERT INTO review_assignment(founder_id, founder_name, reviewer_email, reviewer_name, " +
+    "assigned_by, status, sla_due, created_at) VALUES(?,?,?,?,?,?, date('now','+5 day'), datetime('now'))"
+  ).run(founder_id, fb.name || "", reviewer_email, reviewer_name, g.email, status);
+  const startup = fb.company || fb.name || "a founder";
+  notify("review_assigned", [reviewer_email],
+    "You've been assigned a VentureReady review",
+    "TiE Bangalore has assigned you to review " + startup + "'s submission. " +
+    "Target turnaround is 3–5 business days. Please open the Team Portal to begin.", "normal");
+  notify("review_assigned_admin", ["admins"],
+    "Review assigned: " + startup,
+    g.email + " assigned " + startup + "'s review to " + reviewer_name +
+    " (" + reviewer_email + ").", "normal");
+  return { ok: true, queue: review_queue() };
+}
+
+// ---- Investors (real screened-access records) -----------------------------
+function _investor_row(r) {
+  if (!r) return null;
+  return {
+    id: r.id, name: r.name || "", email: r.email || "", firm: r.firm || "",
+    tie_status: r.tie_status || "", cheque_size: r.cheque_size || "",
+    focus: r.focus || "", track_record: r.track_record || "",
+    recent_investments: r.recent_investments || "", status: r.status || "pending",
+    parent_investor_id: r.parent_investor_id,
+    decided_by: r.decided_by || "", decided_at: r.decided_at || "",
+    created_at: r.created_at || "",
+  };
+}
+
+function investor_apply(d) {
+  // A screened-access application from the public investor form. Creates (or
+  // refreshes) a 'pending' investor record and tells the admins to review it.
+  const email = (d.email || "").trim().toLowerCase();
+  const name = (d.name || "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return { error: "Please enter a valid email address.", status: 400 };
+  }
+  if (!name) return { error: "Please enter your full name.", status: 400 };
+  const f = {
+    firm: (d.firm || "").trim(), tie_status: (d.tie_status || "").trim(),
+    cheque_size: (d.cheque_size || "").trim(), focus: (d.focus || "").trim(),
+    track_record: (d.track_record || "").trim(),
+    recent_investments: (d.recent_investments || "").trim(),
+  };
+  const existing = db.prepare("SELECT * FROM investor WHERE email=?").get(email);
+  if (existing && (existing.status || "") === "approved") {
+    return { error: "That email already has approved investor access. Please sign in instead.", status: 400 };
+  }
+  let iid;
+  if (existing) {
+    db.prepare(
+      "UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, " +
+      "track_record=?, recent_investments=?, status='pending' WHERE id=?"
+    ).run(name, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record,
+      f.recent_investments, existing.id);
+    iid = existing.id;
+  } else {
+    const cur = db.prepare(
+      "INSERT INTO investor(name, email, firm, tie_status, cheque_size, focus, track_record, " +
+      "recent_investments, status, created_at) VALUES(?,?,?,?,?,?,?,?, 'pending', datetime('now'))"
+    ).run(name, email, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record, f.recent_investments);
+    iid = cur.lastInsertRowid;
+  }
+  const row = db.prepare("SELECT * FROM investor WHERE id=?").get(iid);
+  notify("investor_application", ["admins"],
+    "New investor application: " + (f.firm || name),
+    name + " (" + email + ")" + (f.firm ? " from " + f.firm : "") +
+    " applied for screened deal-flow access. TiE status: " +
+    (f.tie_status || "not stated") + ". Review them in the Team Portal.", "normal");
+  return { investor: _investor_row(row) };
+}
+
+async function investor_list(idToken) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  const rows = db.prepare("SELECT * FROM investor ORDER BY id DESC").all();
+  return { investors: rows.map(_investor_row) };
+}
+
+async function investor_decision(idToken, investor_id, decision, reason) {
+  // Admin approves or rejects a screened-access application; the investor is told.
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  if (!["approved", "rejected"].includes(decision)) {
+    return { error: "decision must be 'approved' or 'rejected'.", status: 400 };
+  }
+  const row = db.prepare("SELECT * FROM investor WHERE id=?").get(investor_id);
+  if (!row) return { error: "Unknown investor.", status: 404 };
+  db.prepare("UPDATE investor SET status=?, decided_by=?, decided_at=datetime('now') WHERE id=?")
+    .run(decision, g.email, investor_id);
+  const who = row.name || row.email;
+  if (decision === "approved") {
+    notify("investor_approved", [row.email],
+      "Your VentureReady investor access is approved",
+      "Good news — TiE Bangalore has approved your application for screened deal-flow " +
+      "access. The next step is to sign your NDA, after which you can view " +
+      "VentureReady-marked founders.", "normal");
+  } else {
+    notify("investor_rejected", [row.email],
+      "About your VentureReady investor application",
+      "Thank you for applying for screened deal-flow access. After review, TiE Bangalore " +
+      "is not able to approve your application at this time." +
+      (reason ? " Note: " + reason : ""), "normal");
+  }
+  notify("investor_decision_admin", ["admins"],
+    "Investor " + decision + ": " + who,
+    g.email + " " + decision + " " + who + " (" + row.email + ").", "normal");
+  const listed = await investor_list(idToken);
+  return { ok: true, investors: listed.investors || [] };
+}
+
+const INVESTOR_TEAM_SEATS = 3;
+
+function investor_invite(d) {
+  // An approved investor adds up to 3 colleagues from their firm. Each becomes
+  // its own 'invited' investor row (each must sign their own NDA), and each is
+  // notified individually — the inviter's signature does NOT cover them.
+  const inviter_email = (d.inviter_email || "").trim().toLowerCase();
+  const users = d.users || [];
+  const inviter = db.prepare("SELECT * FROM investor WHERE email=?").get(inviter_email);
+  if (!inviter) {
+    return { error: "We couldn't find your investor record. Please apply first.", status: 404 };
+  }
+  if ((inviter.status || "") !== "approved") {
+    return { error: "Your investor access isn't approved yet, so you can't add team members.", status: 403 };
+  }
+  const parent_id = inviter.parent_investor_id || inviter.id;
+  const used = db.prepare("SELECT COUNT(*) c FROM investor WHERE parent_investor_id=?").get(parent_id).c;
+  const added = [], skipped = [];
+  const insTeam = db.prepare(
+    "INSERT INTO investor(name, email, firm, tie_status, status, parent_investor_id, created_at) " +
+    "VALUES(?,?,?,?, 'invited', ?, datetime('now'))");
+  users.forEach((u) => {
+    const email = ((u || {}).email || "").trim().toLowerCase();
+    const name = ((u || {}).name || "").trim();
+    if (!email) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      skipped.push({ email: email, why: "not a valid email address" });
+      return;
+    }
+    if (used + added.length >= INVESTOR_TEAM_SEATS) {
+      skipped.push({ email: email, why: "no team seats left (limit " + INVESTOR_TEAM_SEATS + ")" });
+      return;
+    }
+    if (db.prepare("SELECT 1 FROM investor WHERE email=?").get(email)) {
+      skipped.push({ email: email, why: "already has a VentureReady investor record" });
+      return;
+    }
+    insTeam.run(name || email.split("@")[0], email, inviter.firm || "", inviter.tie_status || "", parent_id);
+    added.push({ email: email, name: name || email.split("@")[0] });
+  });
+  const firm = inviter.firm || "your firm";
+  added.forEach((a) => {
+    notify("investor_user_invited", [a.email],
+      "You've been invited to VentureReady deal flow",
+      (inviter.name || inviter_email) + " has added you to " + firm +
+      "'s VentureReady deal-flow access. You must verify your email and sign your own " +
+      "NDA before you can view any founder material — their signature does not cover you.",
+      "normal");
+  });
+  if (added.length) {
+    const emails = added.map((a) => a.email).join(", ");
+    notify("investor_users_added", [inviter_email],
+      "Your firm's team invitations were sent",
+      "You added " + added.length + " colleague(s) to " + firm +
+      "'s VentureReady access: " + emails + ". Each must sign their own NDA.", "normal");
+    notify("investor_users_added_admin", ["admins"],
+      "Investor team seats used: " + firm,
+      (inviter.name || inviter_email) + " added " + added.length +
+      " team member(s) to " + firm + ": " + emails + ".", "normal");
+  }
+  return { added: added, skipped: skipped,
+    seats_left: Math.max(0, INVESTOR_TEAM_SEATS - (used + added.length)) };
+}
+
+// ---- Meeting requests (TiE-facilitated introductions) ----------------------
+function meeting_request(d) {
+  // An investor asks TiE to introduce them to a founder. TiE facilitates every
+  // intro, so this notifies the admins — never the founder directly.
+  const founder_id = d.founder_id;
+  const investor_email = (d.investor_email || "").trim().toLowerCase();
+  let investor_name = (d.investor_name || "").trim();
+  const fb = founder_id ? _founder_brief(founder_id) : {};
+  const founder_name = (d.founder_name || fb.name || "").trim();
+  const startup = (d.startup || fb.company || "").trim();
+  if (!founder_name && !startup) {
+    return { error: "We need to know which founder you'd like to meet.", status: 400 };
+  }
+  let investor_id = null;
+  if (investor_email) {
+    const inv = db.prepare("SELECT * FROM investor WHERE email=?").get(investor_email);
+    if (inv) {
+      investor_id = inv.id;
+      investor_name = investor_name || (inv.name || "");
+    }
+  }
+  const cur = db.prepare(
+    "INSERT INTO meeting(founder_id, founder_name, startup, investor_id, investor_name, " +
+    "investor_email, status, requested_at) VALUES(?,?,?,?,?,?, 'requested', datetime('now'))"
+  ).run(founder_id, founder_name, startup, investor_id, investor_name, investor_email);
+  const row = db.prepare("SELECT * FROM meeting WHERE id=?").get(cur.lastInsertRowid);
+  notify("meeting_requested", ["admins"],
+    "Meeting request: " + (investor_name || investor_email || "An investor") + " → " +
+    (startup || founder_name),
+    (investor_name || investor_email || "An investor") + " has requested a TiE-facilitated " +
+    "introduction to " + (founder_name || "a founder") +
+    (startup ? " (" + startup + ")" : "") + ". Approve and send the intro from the " +
+    "Team Portal.", "normal");
+  return { meeting: row };
+}
+
+async function meeting_list(idToken) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  return { meetings: db.prepare("SELECT * FROM meeting ORDER BY id DESC").all() };
+}
+
+async function meeting_intro_sent(idToken, meeting_id) {
+  // Admin confirms the introduction has been made: both sides are told.
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  const row = db.prepare("SELECT * FROM meeting WHERE id=?").get(meeting_id);
+  if (!row) return { error: "Unknown meeting request.", status: 404 };
+  db.prepare("UPDATE meeting SET status='intro_sent', intro_sent_at=datetime('now') WHERE id=?")
+    .run(meeting_id);
+  const fb = row.founder_id ? _founder_brief(row.founder_id) : {};
+  const founder_email = fb.email || "";
+  const startup = row.startup || fb.company || "";
+  const inv_who = row.investor_name || row.investor_email || "an investor";
+  if (founder_email) {
+    notify("meeting_intro_sent_founder", [founder_email],
+      "An investor introduction has been made",
+      "TiE Bangalore has introduced you to " + inv_who +
+      ", who asked to meet after seeing your VentureReady profile. Look out for the " +
+      "introduction email and reply directly to arrange a time.", "normal");
+  }
+  if (row.investor_email) {
+    notify("meeting_intro_sent_investor", [row.investor_email],
+      "Your introduction has been made",
+      "TiE Bangalore has introduced you to " + (row.founder_name || "the founder") +
+      (startup ? " (" + startup + ")" : "") +
+      ". You can now correspond directly to arrange a meeting.", "normal");
+  }
+  notify("meeting_intro_sent_admin", ["admins"],
+    "Intro sent: " + inv_who + " → " + (startup || row.founder_name || "founder"),
+    g.email + " marked the introduction between " + inv_who + " and " +
+    (row.founder_name || "the founder") + " as sent.", "normal");
+  const listed = await meeting_list(idToken);
+  return { ok: true, meetings: listed.meetings || [] };
 }
 
 const CHAPTER = "TiE Bangalore";
@@ -1254,6 +1615,44 @@ async function handlePost(req, res, urlObj, data) {
     return sendJson(res, 200, result);
   } else if (p === "/api/support") {
     return sendJson(res, 200, support_add(data));
+  } else if (p === "/api/payment/record") {
+    const out = payment_record(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/admin/review-queue") {
+    const g = await require_admin(data.credential || "");
+    if (g.error) return sendJson(res, g.status, { error: g.error });
+    return sendJson(res, 200, { queue: review_queue() });
+  } else if (p === "/api/review/assign") {
+    const out = await review_assign(data.credential || "", data.founder_id,
+      data.reviewer_email || "", data.reviewer_name || "");
+    if (out.error) return sendJson(res, out.status || 400, { error: out.error });
+    return sendJson(res, 200, out);
+  } else if (p === "/api/investor/apply") {
+    const out = investor_apply(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/admin/investors") {
+    const out = await investor_list(data.credential || "");
+    if (out.error) return sendJson(res, out.status || 403, { error: out.error });
+    return sendJson(res, 200, out);
+  } else if (p === "/api/investor/decision") {
+    const out = await investor_decision(data.credential || "", data.investor_id,
+      data.decision || "", data.reason || "");
+    if (out.error) return sendJson(res, out.status || 400, { error: out.error });
+    return sendJson(res, 200, out);
+  } else if (p === "/api/investor/invite") {
+    const out = investor_invite(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/meeting/request") {
+    const out = meeting_request(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/admin/meetings") {
+    const out = await meeting_list(data.credential || "");
+    if (out.error) return sendJson(res, out.status || 403, { error: out.error });
+    return sendJson(res, 200, out);
+  } else if (p === "/api/meeting/intro-sent") {
+    const out = await meeting_intro_sent(data.credential || "", data.meeting_id);
+    if (out.error) return sendJson(res, out.status || 400, { error: out.error });
+    return sendJson(res, 200, out);
   } else {
     return sendJson(res, 404, { error: "unknown endpoint" });
   }

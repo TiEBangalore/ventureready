@@ -93,6 +93,35 @@ def db_init():
         id INTEGER PRIMARY KEY AUTOINCREMENT, notification_id INTEGER, to_email TEXT,
         subject TEXT, body TEXT, status TEXT DEFAULT 'pending', error TEXT,
         created_at TEXT, sent_at TEXT)""")
+    # Payments: a real row every time a founder/investor pays for something
+    # (membership, expert review, deal-flow access). No card data is stored —
+    # this is the prototype record that drives the receipt notification.
+    conn.execute("""CREATE TABLE IF NOT EXISTS payment(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, payer_email TEXT, payer_name TEXT,
+        founder_id INTEGER, item TEXT, amount TEXT, period TEXT,
+        status TEXT DEFAULT 'paid', created_at TEXT)""")
+    # Review assignment: which reviewer is responsible for a founder's review,
+    # who assigned it, and the SLA target. One row per assignment/reassignment.
+    conn.execute("""CREATE TABLE IF NOT EXISTS review_assignment(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
+        reviewer_email TEXT, reviewer_name TEXT, assigned_by TEXT,
+        status TEXT DEFAULT 'assigned', sla_due TEXT, created_at TEXT)""")
+    # Investors: real screened-access records. A primary applicant is a row with
+    # parent_investor_id = NULL; each firm team-mate they invite is a row that
+    # points back to the primary via parent_investor_id. status walks:
+    # 'pending' -> 'approved' | 'rejected'; invited team-mates start 'invited'.
+    conn.execute("""CREATE TABLE IF NOT EXISTS investor(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, firm TEXT,
+        tie_status TEXT, cheque_size TEXT, focus TEXT, track_record TEXT,
+        recent_investments TEXT, status TEXT DEFAULT 'pending', parent_investor_id INTEGER,
+        decided_by TEXT, decided_at TEXT, created_at TEXT)""")
+    # Meeting requests: an investor asks TiE to introduce them to a founder.
+    # TiE facilitates every intro (no direct messaging). status walks:
+    # 'requested' -> 'intro_sent' -> 'held' | 'declined'.
+    conn.execute("""CREATE TABLE IF NOT EXISTS meeting(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
+        startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
+        status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)""")
     conn.commit()
     if conn.execute("SELECT COUNT(*) c FROM support").fetchone()["c"] == 0:
         seeds = [
@@ -599,6 +628,354 @@ def notifications_recent(limit=100):
              "subject": r["subject"], "body": r["body"],
              "urgency": r["urgency"] or "normal", "created_at": r["created_at"] or "",
              "status": r["status"] or "pending"} for r in rows]
+
+# ---- Payments (real records + receipt notification) -----------------------
+def payment_record(d):
+    # Record a payment. No card details are ever stored — only what was bought.
+    # Fires a receipt to the payer and a heads-up to admins.
+    payer_email = (d.get("payer_email") or "").strip().lower()
+    payer_name = (d.get("payer_name") or "").strip()
+    founder_id = d.get("founder_id")
+    item = (d.get("item") or "").strip()
+    amount = (d.get("amount") or "").strip()
+    period = (d.get("period") or "").strip()
+    # Fall back to the logged-in founder's email if the caller didn't send one.
+    if not payer_email and founder_id:
+        fb = _founder_brief(founder_id)
+        payer_email = (fb.get("email") or "").strip().lower()
+        payer_name = payer_name or fb.get("name") or ""
+    # Don't record an empty shell of a payment — we need at least what was
+    # bought, or someone to attribute it to.
+    if not item and not payer_email:
+        return {"error": "A payment needs at least an item or a payer.", "status": 400}
+    conn = _db()
+    cur = conn.execute(
+        "INSERT INTO payment(payer_email, payer_name, founder_id, item, amount, period, "
+        "status, created_at) VALUES(?,?,?,?,?,?, 'paid', datetime('now'))",
+        (payer_email, payer_name, founder_id, item, amount, period))
+    pid = cur.lastrowid
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM payment WHERE id=?", (pid,)).fetchone())
+    conn.close()
+    amt_str = (amount + (" " + period if period else "")).strip()
+    if payer_email:
+        notify("payment_receipt", [payer_email],
+               "Your VentureReady payment receipt",
+               "We've received your payment of " + (amt_str or "your fee") + " for " +
+               (item or "VentureReady access") + ". Thank you — your access is now active.",
+               "normal")
+    notify("payment_received", ["admins"],
+           "Payment received: " + (item or "VentureReady access"),
+           (payer_name or payer_email or "A user") + " paid " + (amt_str or "a fee") +
+           " for " + (item or "VentureReady access") + ".", "normal")
+    return {"payment": row}
+
+# ---- Reviewer assignment (real records + reviewer notification) -----------
+def review_queue():
+    # Founders who have submitted at least one deck are candidates for review.
+    # For each, show their most recent reviewer assignment (if any).
+    conn = _db()
+    rows = conn.execute(
+        "SELECT f.id, f.name, f.company, f.stage, f.sector, "
+        "  (SELECT MAX(uploaded_at) FROM deck d WHERE d.founder_id=f.id) AS last_deck, "
+        "  (SELECT COUNT(*) FROM deck d WHERE d.founder_id=f.id) AS deck_count "
+        "FROM founder f "
+        "WHERE (SELECT COUNT(*) FROM deck d WHERE d.founder_id=f.id) > 0 "
+        "ORDER BY last_deck DESC").fetchall()
+    out = []
+    for r in rows:
+        a = conn.execute(
+            "SELECT reviewer_email, reviewer_name, status, created_at FROM review_assignment "
+            "WHERE founder_id=? ORDER BY id DESC LIMIT 1", (r["id"],)).fetchone()
+        out.append({"founder_id": r["id"], "name": r["name"] or "", "company": r["company"] or "",
+                    "stage": r["stage"] or "", "sector": r["sector"] or "",
+                    "last_deck": r["last_deck"] or "", "deck_count": r["deck_count"] or 0,
+                    "reviewer_email": (a["reviewer_email"] if a else ""),
+                    "reviewer_name": (a["reviewer_name"] if a else ""),
+                    "assignment_status": (a["status"] if a else "")})
+    conn.close()
+    return out
+
+def review_assign(id_token, founder_id, reviewer_email, reviewer_name):
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    reviewer_email = (reviewer_email or "").strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", reviewer_email):
+        return {"error": "Please enter a valid reviewer email address.", "status": 400}
+    fb = _founder_brief(founder_id)
+    if not fb.get("email") and not fb.get("name"):
+        return {"error": "Unknown founder.", "status": 404}
+    reviewer_name = (reviewer_name or "").strip() or reviewer_email.split("@")[0]
+    prior = None
+    conn = _db()
+    prior = conn.execute("SELECT COUNT(*) c FROM review_assignment WHERE founder_id=?",
+                         (founder_id,)).fetchone()["c"]
+    status = "reassigned" if prior else "assigned"
+    conn.execute(
+        "INSERT INTO review_assignment(founder_id, founder_name, reviewer_email, reviewer_name, "
+        "assigned_by, status, sla_due, created_at) VALUES(?,?,?,?,?,?, date('now','+5 day'), datetime('now'))",
+        (founder_id, fb.get("name") or "", reviewer_email, reviewer_name, g["email"], status))
+    conn.commit()
+    conn.close()
+    startup = (fb.get("company") or fb.get("name") or "a founder")
+    notify("review_assigned", [reviewer_email],
+           "You've been assigned a VentureReady review",
+           "TiE Bangalore has assigned you to review " + startup + "'s submission. "
+           "Target turnaround is 3–5 business days. Please open the Team Portal to begin.", "normal")
+    notify("review_assigned_admin", ["admins"],
+           "Review assigned: " + startup,
+           g["email"] + " assigned " + startup + "'s review to " + reviewer_name +
+           " (" + reviewer_email + ").", "normal")
+    return {"ok": True, "queue": review_queue()}
+
+# ---- Investors (real screened-access records) -----------------------------
+def _investor_row(r):
+    if r is None:
+        return None
+    return {"id": r["id"], "name": r["name"] or "", "email": r["email"] or "",
+            "firm": r["firm"] or "", "tie_status": r["tie_status"] or "",
+            "cheque_size": r["cheque_size"] or "", "focus": r["focus"] or "",
+            "track_record": r["track_record"] or "",
+            "recent_investments": r["recent_investments"] or "",
+            "status": r["status"] or "pending",
+            "parent_investor_id": r["parent_investor_id"],
+            "decided_by": r["decided_by"] or "", "decided_at": r["decided_at"] or "",
+            "created_at": r["created_at"] or ""}
+
+def investor_apply(d):
+    # A screened-access application from the public investor form. Creates (or
+    # refreshes) a 'pending' investor record and tells the admins to review it.
+    email = (d.get("email") or "").strip().lower()
+    name = (d.get("name") or "").strip()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return {"error": "Please enter a valid email address.", "status": 400}
+    if not name:
+        return {"error": "Please enter your full name.", "status": 400}
+    fields = {"firm": (d.get("firm") or "").strip(),
+              "tie_status": (d.get("tie_status") or "").strip(),
+              "cheque_size": (d.get("cheque_size") or "").strip(),
+              "focus": (d.get("focus") or "").strip(),
+              "track_record": (d.get("track_record") or "").strip(),
+              "recent_investments": (d.get("recent_investments") or "").strip()}
+    conn = _db()
+    existing = conn.execute("SELECT * FROM investor WHERE email=?", (email,)).fetchone()
+    if existing and (existing["status"] or "") == "approved":
+        conn.close()
+        return {"error": "That email already has approved investor access. Please sign in instead.",
+                "status": 400}
+    if existing:
+        conn.execute("UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, "
+                     "track_record=?, recent_investments=?, status='pending' WHERE id=?",
+                     (name, fields["firm"], fields["tie_status"], fields["cheque_size"],
+                      fields["focus"], fields["track_record"], fields["recent_investments"],
+                      existing["id"]))
+        iid = existing["id"]
+    else:
+        cur = conn.execute(
+            "INSERT INTO investor(name, email, firm, tie_status, cheque_size, focus, track_record, "
+            "recent_investments, status, created_at) VALUES(?,?,?,?,?,?,?,?, 'pending', datetime('now'))",
+            (name, email, fields["firm"], fields["tie_status"], fields["cheque_size"],
+             fields["focus"], fields["track_record"], fields["recent_investments"]))
+        iid = cur.lastrowid
+    conn.commit()
+    row = conn.execute("SELECT * FROM investor WHERE id=?", (iid,)).fetchone()
+    conn.close()
+    notify("investor_application", ["admins"],
+           "New investor application: " + (fields["firm"] or name),
+           name + " (" + email + ")" + (" from " + fields["firm"] if fields["firm"] else "") +
+           " applied for screened deal-flow access. TiE status: " +
+           (fields["tie_status"] or "not stated") + ". Review them in the Team Portal.", "normal")
+    return {"investor": _investor_row(row)}
+
+def investor_list(id_token):
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    conn = _db()
+    rows = conn.execute("SELECT * FROM investor ORDER BY id DESC").fetchall()
+    conn.close()
+    return {"investors": [_investor_row(r) for r in rows]}
+
+def investor_decision(id_token, investor_id, decision, reason=""):
+    # Admin approves or rejects a screened-access application; the investor is told.
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    if decision not in ("approved", "rejected"):
+        return {"error": "decision must be 'approved' or 'rejected'.", "status": 400}
+    conn = _db()
+    row = conn.execute("SELECT * FROM investor WHERE id=?", (investor_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "Unknown investor.", "status": 404}
+    conn.execute("UPDATE investor SET status=?, decided_by=?, decided_at=datetime('now') WHERE id=?",
+                 (decision, g["email"], investor_id))
+    conn.commit()
+    conn.close()
+    who = row["name"] or row["email"]
+    if decision == "approved":
+        notify("investor_approved", [row["email"]],
+               "Your VentureReady investor access is approved",
+               "Good news — TiE Bangalore has approved your application for screened deal-flow "
+               "access. The next step is to sign your NDA, after which you can view "
+               "VentureReady-marked founders.", "normal")
+    else:
+        notify("investor_rejected", [row["email"]],
+               "About your VentureReady investor application",
+               "Thank you for applying for screened deal-flow access. After review, TiE Bangalore "
+               "is not able to approve your application at this time." +
+               ((" Note: " + reason) if reason else ""), "normal")
+    notify("investor_decision_admin", ["admins"],
+           "Investor " + decision + ": " + who,
+           g["email"] + " " + decision + " " + who + " (" + row["email"] + ").", "normal")
+    return {"ok": True, "investors": investor_list(id_token).get("investors", [])}
+
+INVESTOR_TEAM_SEATS = 3
+
+def investor_invite(d):
+    # An approved investor adds up to 3 colleagues from their firm. Each becomes
+    # its own 'invited' investor row (each must sign their own NDA), and each is
+    # notified individually — the inviter's signature does NOT cover them.
+    inviter_email = (d.get("inviter_email") or "").strip().lower()
+    users = d.get("users") or []
+    conn = _db()
+    inviter = conn.execute("SELECT * FROM investor WHERE email=?", (inviter_email,)).fetchone()
+    if not inviter:
+        conn.close()
+        return {"error": "We couldn't find your investor record. Please apply first.", "status": 404}
+    if (inviter["status"] or "") != "approved":
+        conn.close()
+        return {"error": "Your investor access isn't approved yet, so you can't add team members.",
+                "status": 403}
+    parent_id = inviter["parent_investor_id"] or inviter["id"]
+    used = conn.execute("SELECT COUNT(*) c FROM investor WHERE parent_investor_id=?",
+                        (parent_id,)).fetchone()["c"]
+    added, skipped = [], []
+    for u in users:
+        email = ((u or {}).get("email") or "").strip().lower()
+        name = ((u or {}).get("name") or "").strip()
+        if not email:
+            continue
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            skipped.append({"email": email, "why": "not a valid email address"})
+            continue
+        if used + len(added) >= INVESTOR_TEAM_SEATS:
+            skipped.append({"email": email, "why": "no team seats left (limit %d)" % INVESTOR_TEAM_SEATS})
+            continue
+        if conn.execute("SELECT 1 FROM investor WHERE email=?", (email,)).fetchone():
+            skipped.append({"email": email, "why": "already has a VentureReady investor record"})
+            continue
+        conn.execute(
+            "INSERT INTO investor(name, email, firm, tie_status, status, parent_investor_id, created_at) "
+            "VALUES(?,?,?,?, 'invited', ?, datetime('now'))",
+            (name or email.split("@")[0], email, inviter["firm"] or "", inviter["tie_status"] or "",
+             parent_id))
+        added.append({"email": email, "name": name or email.split("@")[0]})
+    conn.commit()
+    conn.close()
+    firm = inviter["firm"] or "your firm"
+    for a in added:
+        notify("investor_user_invited", [a["email"]],
+               "You've been invited to VentureReady deal flow",
+               (inviter["name"] or inviter_email) + " has added you to " + firm +
+               "'s VentureReady deal-flow access. You must verify your email and sign your own "
+               "NDA before you can view any founder material — their signature does not cover you.",
+               "normal")
+    if added:
+        notify("investor_users_added", [inviter_email],
+               "Your firm's team invitations were sent",
+               "You added " + str(len(added)) + " colleague(s) to " + firm +
+               "'s VentureReady access: " + ", ".join(a["email"] for a in added) +
+               ". Each must sign their own NDA.", "normal")
+        notify("investor_users_added_admin", ["admins"],
+               "Investor team seats used: " + firm,
+               (inviter["name"] or inviter_email) + " added " + str(len(added)) +
+               " team member(s) to " + firm + ": " + ", ".join(a["email"] for a in added) + ".",
+               "normal")
+    return {"added": added, "skipped": skipped,
+            "seats_left": max(0, INVESTOR_TEAM_SEATS - (used + len(added)))}
+
+# ---- Meeting requests (TiE-facilitated introductions) ----------------------
+def meeting_request(d):
+    # An investor asks TiE to introduce them to a founder. TiE facilitates every
+    # intro, so this notifies the admins — never the founder directly.
+    founder_id = d.get("founder_id")
+    investor_email = (d.get("investor_email") or "").strip().lower()
+    investor_name = (d.get("investor_name") or "").strip()
+    fb = _founder_brief(founder_id) if founder_id else {}
+    founder_name = (d.get("founder_name") or fb.get("name") or "").strip()
+    startup = (d.get("startup") or fb.get("company") or "").strip()
+    if not founder_name and not startup:
+        return {"error": "We need to know which founder you'd like to meet.", "status": 400}
+    investor_id = None
+    conn = _db()
+    if investor_email:
+        inv = conn.execute("SELECT * FROM investor WHERE email=?", (investor_email,)).fetchone()
+        if inv:
+            investor_id = inv["id"]
+            investor_name = investor_name or (inv["name"] or "")
+    cur = conn.execute(
+        "INSERT INTO meeting(founder_id, founder_name, startup, investor_id, investor_name, "
+        "investor_email, status, requested_at) VALUES(?,?,?,?,?,?, 'requested', datetime('now'))",
+        (founder_id, founder_name, startup, investor_id, investor_name, investor_email))
+    mid = cur.lastrowid
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM meeting WHERE id=?", (mid,)).fetchone())
+    conn.close()
+    notify("meeting_requested", ["admins"],
+           "Meeting request: " + (investor_name or investor_email or "An investor") + " → " +
+           (startup or founder_name),
+           (investor_name or investor_email or "An investor") + " has requested a TiE-facilitated "
+           "introduction to " + (founder_name or "a founder") +
+           (" (" + startup + ")" if startup else "") + ". Approve and send the intro from the "
+           "Team Portal.", "normal")
+    return {"meeting": row}
+
+def meeting_list(id_token):
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    conn = _db()
+    rows = [dict(r) for r in conn.execute("SELECT * FROM meeting ORDER BY id DESC").fetchall()]
+    conn.close()
+    return {"meetings": rows}
+
+def meeting_intro_sent(id_token, meeting_id):
+    # Admin confirms the introduction has been made: both sides are told.
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    conn = _db()
+    row = conn.execute("SELECT * FROM meeting WHERE id=?", (meeting_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "Unknown meeting request.", "status": 404}
+    conn.execute("UPDATE meeting SET status='intro_sent', intro_sent_at=datetime('now') WHERE id=?",
+                 (meeting_id,))
+    conn.commit()
+    conn.close()
+    fb = _founder_brief(row["founder_id"]) if row["founder_id"] else {}
+    founder_email = fb.get("email") or ""
+    startup = row["startup"] or fb.get("company") or ""
+    inv_who = row["investor_name"] or row["investor_email"] or "an investor"
+    if founder_email:
+        notify("meeting_intro_sent_founder", [founder_email],
+               "An investor introduction has been made",
+               "TiE Bangalore has introduced you to " + inv_who +
+               ", who asked to meet after seeing your VentureReady profile. Look out for the "
+               "introduction email and reply directly to arrange a time.", "normal")
+    if row["investor_email"]:
+        notify("meeting_intro_sent_investor", [row["investor_email"]],
+               "Your introduction has been made",
+               "TiE Bangalore has introduced you to " + (row["founder_name"] or "the founder") +
+               (" (" + startup + ")" if startup else "") +
+               ". You can now correspond directly to arrange a meeting.", "normal")
+    notify("meeting_intro_sent_admin", ["admins"],
+           "Intro sent: " + inv_who + " → " + (startup or row["founder_name"] or "founder"),
+           g["email"] + " marked the introduction between " + inv_who + " and " +
+           (row["founder_name"] or "the founder") + " as sent.", "normal")
+    return {"ok": True, "meetings": meeting_list(id_token).get("meetings", [])}
 
 CHAPTER = "TiE Bangalore"
 
@@ -1225,6 +1602,56 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, result)
             elif self.path == "/api/support":
                 self._send(200, support_add(data))
+            elif self.path == "/api/payment/record":
+                out = payment_record(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/admin/review-queue":
+                g = require_admin(data.get("credential", ""))
+                if g.get("error"):
+                    self._send(g["status"], {"error": g["error"]})
+                else:
+                    self._send(200, {"queue": review_queue()})
+            elif self.path == "/api/review/assign":
+                out = review_assign(data.get("credential", ""), data.get("founder_id"),
+                                    data.get("reviewer_email", ""), data.get("reviewer_name", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/investor/apply":
+                out = investor_apply(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/admin/investors":
+                out = investor_list(data.get("credential", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 403), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/investor/decision":
+                out = investor_decision(data.get("credential", ""), data.get("investor_id"),
+                                        data.get("decision", ""), data.get("reason", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/investor/invite":
+                out = investor_invite(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/meeting/request":
+                out = meeting_request(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/admin/meetings":
+                out = meeting_list(data.get("credential", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 403), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/meeting/intro-sent":
+                out = meeting_intro_sent(data.get("credential", ""), data.get("meeting_id"))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
             else:
                 self._send(404, {"error": "unknown endpoint"})
         except Exception as e:
