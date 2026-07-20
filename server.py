@@ -446,6 +446,12 @@ ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY", "")
 # verifies it, so no secret is needed. Blank = feature off (button falls back to demo).
 GOOGLE_CLIENT_ID = ENV.get("GOOGLE_CLIENT_ID", "")
 
+# Where founders go to actually BUY a TiE Bangalore membership. Membership money
+# is not taken in this app — Zoho owns the membership record, so we hand off to
+# it and then re-check the result. Set TIE_MEMBERSHIP_URL in .env; if it's blank
+# the front-end hides the join buttons rather than showing a broken link.
+TIE_MEMBERSHIP_URL = ENV.get("TIE_MEMBERSHIP_URL", "").strip()
+
 # ---- Admin / Team-Portal access allow-list ----
 # Only these Google-verified emails may enter the admin portal. Access is an
 # explicit allow-list (NOT the whole @tiebangalore.org domain).
@@ -895,6 +901,50 @@ def investor_invite(d):
                "normal")
     return {"added": added, "skipped": skipped,
             "seats_left": max(0, INVESTOR_TEAM_SEATS - (used + len(added)))}
+
+# ---- Membership hand-off (money is taken in Zoho, never in this app) -------
+def membership_handoff(d):
+    # Records that a founder was sent to Zoho to join, so admins can follow up
+    # on people who start but never finish. This is NOT a payment record — the
+    # app never sees the money and never claims they paid.
+    founder_id = d.get("founder_id")
+    fb = _founder_brief(founder_id) if founder_id else {}
+    email = (d.get("email") or fb.get("email") or "").strip().lower()
+    name = (d.get("name") or fb.get("name") or "").strip()
+    tier = (d.get("tier") or "Associate Membership").strip()
+    # Only tell admins when we know WHO set out to join — an alert naming nobody
+    # can't be followed up on, so it would just be noise in the feed.
+    if not (email or name):
+        return {"ok": True, "recorded": False}
+    notify("membership_handoff", ["admins"],
+           "Founder started joining TiE: " + (name or email),
+           (name or email) + " opened the TiE Bangalore membership page to buy " + tier +
+           ". Nothing is confirmed until their membership record exists — the app re-checks "
+           "it when they come back, so follow up if it never appears.", "normal")
+    return {"ok": True, "recorded": True}
+
+def membership_recheck(d):
+    # After the founder says they've joined, ask Zoho again and cache the answer.
+    # Zoho stays the source of truth; the app never marks anyone a member itself.
+    founder_id = d.get("founder_id")
+    if not founder_id:
+        return {"error": "Please sign in first so we know whose membership to check.",
+                "status": 400}
+    row = refresh_membership(founder_id)
+    if not row:
+        return {"error": "We couldn't find your account.", "status": 404}
+    pub = _public_founder(row) or {}
+    if pub.get("is_member"):
+        notify("membership_confirmed", [pub.get("email") or ""],
+               "Your TiE Bangalore membership is confirmed",
+               "Thanks " + (pub.get("name") or "") + " — we've confirmed your TiE Bangalore "
+               "membership with our records. Your VentureReady expert review is now included.",
+               "normal")
+        notify("membership_confirmed_admin", ["admins"],
+               "New TiE member confirmed: " + (pub.get("name") or pub.get("email") or ""),
+               (pub.get("name") or pub.get("email") or "A founder") +
+               " completed TiE Bangalore membership and it is now confirmed in Zoho.", "normal")
+    return {"founder": pub}
 
 # ---- Meeting requests (TiE-facilitated introductions) ----------------------
 def meeting_request(d):
@@ -1422,7 +1472,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/config":
             # Public front-end config. Only non-secret values belong here. The
             # Google Client ID is designed to be public (the browser needs it).
-            return self._send(200, {"googleClientId": GOOGLE_CLIENT_ID})
+            return self._send(200, {"googleClientId": GOOGLE_CLIENT_ID,
+                                    "membershipUrl": TIE_MEMBERSHIP_URL})
         if path == "/api/support":
             return self._send(200, support_list())
         if path == "/api/review":
@@ -1634,6 +1685,11 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(out.get("status", 400), {"error": out["error"]})
                 else:
                     self._send(200, out)
+            elif self.path == "/api/membership/handoff":
+                self._send(200, membership_handoff(data))
+            elif self.path == "/api/membership/recheck":
+                out = membership_recheck(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
             elif self.path == "/api/investor/invite":
                 out = investor_invite(data)
                 self._send(out.get("status", 400) if out.get("error") else 200, out)

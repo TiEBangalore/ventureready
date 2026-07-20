@@ -1137,7 +1137,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
               <button class="btn btn-outline" onclick="go('review-only-nudge')" style="white-space:nowrap;">Expert Review only — ₹3,000 + GST</button>
               <span style="font-size:12px;color:var(--mid);">or</span>
-              <button class="btn btn-red btn-lg" onclick="goPay('TiE Bangalore Annual Membership', '₹10,000', ' + GST / year', 'interview')" style="white-space:nowrap;">Join TiE Bangalore — ₹10,000 + GST / year →</button>
+              <button class="btn btn-red btn-lg" onclick="goMembership('interview')" style="white-space:nowrap;">Join TiE Bangalore — ₹10,000 + GST / year →</button>
             </div>
           </div>
           <button class="btn btn-outline" onclick="go('member')" style="flex-shrink:0;">Compare options</button>
@@ -1627,7 +1627,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <div><div style="font-size:12px;font-weight:700;">Global Advantage</div><div style="font-size:11px;color:var(--grey);">Discounted TiE events + free member-only programs</div></div>
           </div>
         </div>
-        <button class="btn btn-red btn-full btn-lg" onclick="goPay('TiE Bangalore Annual Membership', '₹10,000', ' + GST / year', 'interview')">Join TiE Bangalore — ₹10,000 + GST / year →</button>
+        <button class="btn btn-red btn-full btn-lg" onclick="goMembership('interview')">Join TiE Bangalore — ₹10,000 + GST / year →</button>
         <div style="text-align:center;font-size:11px;color:var(--mid);margin-top:10px;">Annual membership · Cancel by not renewing</div>
       </div>
     </div>
@@ -3480,7 +3480,7 @@ function unflagConflict(founder, el){
       </div>
       <div style="padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;background:#fff;">
         <div style="font-size:13px;color:var(--grey);line-height:1.6;">₹7,000 more per year gets you the full network, funding pathways, and every TiE program. <strong style="color:var(--dark);">Your mark will also be visible to screened investors on the platform.</strong></div>
-        <button class="btn btn-red btn-lg" onclick="goPay('TiE Bangalore Annual Membership','₹10,000',' + GST / year','interview')" style="flex-shrink:0;white-space:nowrap;">Join TiE Bangalore →</button>
+        <button class="btn btn-red btn-lg" onclick="goMembership('interview')" style="flex-shrink:0;white-space:nowrap;">Join TiE Bangalore →</button>
       </div>
     </div>
 
@@ -3488,6 +3488,53 @@ function unflagConflict(founder, el){
     <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:4px;">
       <div style="font-size:13px;color:var(--grey);">If you join TiE Bangalore later, the full membership fee of ₹10,000 + GST applies — the ₹3,000 + GST review fee is not a credit toward membership.</div>
       <button class="btn btn-outline btn-lg" onclick="goPay('VentureReady Expert Review','₹3,000 + GST',' one-time','interview')" style="flex-shrink:0;white-space:nowrap;">Proceed with Expert Review — ₹3,000 + GST →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
+     SHARED — JOIN TiE BANGALORE (hand-off; money is taken in Zoho, not here)
+══════════════════════════ -->
+<div id="screen-membership" class="screen">
+  <div class="login-bg">
+    <div class="login-card center-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <img class="tie-logo-dark" alt="TiE Bangalore" style="height:32px;width:auto;">
+        <div class="nav-sep"></div>
+        <span style="font-size:15px;font-weight:900;letter-spacing:-0.3px;color:var(--dark);">Venture<span style="color:var(--red);">Ready</span></span>
+      </div>
+      <div style="font-size:12px;color:var(--mid);margin-bottom:20px;">Membership is handled on the TiE Bangalore membership page</div>
+
+      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;">Join TiE Bangalore</h1>
+      <p class="sub" style="margin-bottom:20px;">Membership is managed by TiE Bangalore directly, so you'll finish this on their membership page. We'll confirm it here as soon as it's active.</p>
+
+      <div style="border:1.5px solid var(--red);border-radius:10px;overflow:hidden;margin-bottom:18px;">
+        <div style="background:var(--red-bg);padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--red);">Choose this option</div>
+          <div style="font-size:16px;font-weight:800;color:var(--dark);margin-top:2px;">Associate Membership — ₹10,000 + GST / year</div>
+        </div>
+        <div style="padding:14px 16px;font-size:13px;color:var(--dark);line-height:1.65;">
+          The membership page lists several categories in a drop-down. For founders using VentureReady, pick <strong>Associate Membership</strong>. It includes your expert review, the full TiE network, funding pathways and every TiE programme.
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:6px;">What happens next</div>
+        <div style="font-size:13px;color:var(--dark);line-height:1.7;">
+          1. The membership page opens in a new tab — VentureReady stays open here.<br>
+          2. Select <strong>Associate Membership</strong> and complete your payment there.<br>
+          3. Come back to this tab and press <strong>“I've joined — check my membership”</strong>.
+        </div>
+      </div>
+
+      <div id="membership-link-missing" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--dark);line-height:1.6;">
+        The membership link hasn't been set up yet. Please email <strong>admin.blr@tiebangalore.org</strong> and the team will send you the joining link directly.
+      </div>
+
+      <button class="btn btn-red btn-full btn-lg" id="membership-open-btn" onclick="openMembershipPage(this)">Open the TiE membership page →</button>
+      <button class="btn btn-outline btn-full" style="margin-top:10px" onclick="recheckMembership(this)">I've joined — check my membership</button>
+      <div id="membership-recheck-msg" style="display:none;font-size:13px;margin-top:12px;line-height:1.6;"></div>
+      <button class="btn btn-dark btn-full" style="margin-top:10px" onclick="go(membershipCtx.next||'interview')">Skip for now →</button>
     </div>
   </div>
 </div>
@@ -3607,7 +3654,74 @@ function unflagConflict(founder, el){
 })();
 </script>
 <script>
-let paymentCtx = { name: "TiE Associate Membership", amount: "₹10,000", period: " /year", next: "interview" };
+// In-app checkout now covers the expert review and investor access only —
+// TiE membership is bought on TiE's own membership page (see goMembership).
+let paymentCtx = { name: "VentureReady Expert Review", amount: "₹3,000 + GST", period: " one-time", next: "interview" };
+// ── JOIN TiE BANGALORE ──────────────────────────────────────────────────────
+// Membership money is NOT taken in this app. TiE's own membership page (Zoho)
+// owns the membership record, so we explain the right tier here, hand off, and
+// then re-check with Zoho rather than ever claiming someone has paid.
+var membershipCtx = { next: 'interview' };
+function goMembership(next){
+  membershipCtx = { next: next || 'interview' };
+  var msg=document.getElementById('membership-recheck-msg');
+  if(msg) msg.style.display='none';
+  _reflectMembershipLink();
+  go('membership');
+}
+// Hide the "open" button if no membership URL is configured, so we never show
+// a button that leads nowhere.
+function _reflectMembershipLink(){
+  var btn=document.getElementById('membership-open-btn');
+  var warn=document.getElementById('membership-link-missing');
+  var has=!!(window._membershipUrl);
+  if(btn) btn.style.display = has ? '' : 'none';
+  if(warn) warn.style.display = has ? 'none' : '';
+}
+function openMembershipPage(btn){
+  if(!window._membershipUrl){ _reflectMembershipLink(); return; }
+  // Let the team see who set out to join, so they can follow up on drop-offs.
+  try{
+    fetch('/api/membership/handoff',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_id:window._founderId||null, email:window._founderEmail||'',
+        name:window._founderName||'', tier:'Associate Membership'})}).catch(function(){});
+  }catch(e){}
+  window.open(window._membershipUrl, '_blank', 'noopener');
+}
+async function recheckMembership(btn){
+  var msg=document.getElementById('membership-recheck-msg');
+  function show(t, tone){ if(!msg) return; msg.style.display='';
+    msg.style.color = tone==='ok' ? 'var(--green)' : (tone==='warn' ? '#B45309' : 'var(--red)');
+    msg.innerHTML=t; }
+  if(!window._founderId){
+    show('Please sign in first — then we can check your membership against TiE\'s records.','warn');
+    return;
+  }
+  if(btn){ btn.disabled=true; btn.textContent='Checking…'; }
+  try{
+    var r=await fetch('/api/membership/recheck',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_id:window._founderId})});
+    var out=await r.json();
+    if(btn){ btn.disabled=false; btn.textContent='I\'ve joined — check my membership'; }
+    if(out.error){ show(out.error); return; }
+    var f=out.founder||{};
+    _applyFounder(f);
+    if(f.is_member){
+      show('✓ Confirmed — your TiE Bangalore membership is active'+
+        (f.membership_category?(' ('+_escapeHtml(f.membership_category)+')'):'')+
+        '. Your expert review is included.','ok');
+    }else if(f.membership_stale){
+      show('We couldn\'t reach TiE\'s membership records just now, so we can\'t confirm yet. Please try again shortly.','warn');
+    }else{
+      show('We can\'t see an active membership for '+_escapeHtml(f.email||'your account')+' yet. '+
+        'It can take a little while to appear after payment — try again in a few minutes, or email admin.blr@tiebangalore.org if it doesn\'t show up.','warn');
+    }
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='I\'ve joined — check my membership'; }
+    show('Could not reach the server. Please try again.');
+  }
+}
+
 function goPay(name, amount, period, next){
   paymentCtx = { name, amount, period, next };
   document.getElementById('payName').textContent = name;
@@ -4757,6 +4871,8 @@ async function initGoogleSignIn(){
     var r=await fetch('/api/config');
     var cfg=await r.json();
     clientId=cfg.googleClientId||'';
+    window._membershipUrl=cfg.membershipUrl||'';
+    _reflectMembershipLink();
   }catch(e){}
   if(!clientId) return;                 // not configured → keep the demo fallback button
   // Load Google Identity Services, then initialise + render the real button.

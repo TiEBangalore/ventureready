@@ -465,6 +465,12 @@ const ANTHROPIC_API_KEY = ENV.ANTHROPIC_API_KEY || "";
 // (the button falls back to the demo sign-in).
 const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID || "";
 
+// Where founders go to actually BUY a TiE Bangalore membership. Membership money
+// is not taken in this app — Zoho owns the membership record, so we hand off to
+// it and then re-check the result. Set TIE_MEMBERSHIP_URL in .env; if it's blank
+// the front-end hides the join buttons rather than showing a broken link.
+const TIE_MEMBERSHIP_URL = (ENV.TIE_MEMBERSHIP_URL || "").trim();
+
 // ---- Admin / Team-Portal access allow-list ----
 // Only these Google-verified emails may enter the admin portal. Access is an
 // explicit allow-list (NOT the whole @tiebangalore.org domain).
@@ -863,6 +869,51 @@ function investor_invite(d) {
   }
   return { added: added, skipped: skipped,
     seats_left: Math.max(0, INVESTOR_TEAM_SEATS - (used + added.length)) };
+}
+
+// ---- Membership hand-off (money is taken in Zoho, never in this app) -------
+function membership_handoff(d) {
+  // Records that a founder was sent to Zoho to join, so admins can follow up
+  // on people who start but never finish. This is NOT a payment record — the
+  // app never sees the money and never claims they paid.
+  const founder_id = d.founder_id;
+  const fb = founder_id ? _founder_brief(founder_id) : {};
+  const email = (d.email || fb.email || "").trim().toLowerCase();
+  const name = (d.name || fb.name || "").trim();
+  const tier = (d.tier || "Associate Membership").trim();
+  // Only tell admins when we know WHO set out to join — an alert naming nobody
+  // can't be followed up on, so it would just be noise in the feed.
+  if (!email && !name) return { ok: true, recorded: false };
+  notify("membership_handoff", ["admins"],
+    "Founder started joining TiE: " + (name || email),
+    (name || email) + " opened the TiE Bangalore membership page to buy " + tier +
+    ". Nothing is confirmed until their membership record exists — the app re-checks " +
+    "it when they come back, so follow up if it never appears.", "normal");
+  return { ok: true, recorded: true };
+}
+
+async function membership_recheck(d) {
+  // After the founder says they've joined, ask Zoho again and cache the answer.
+  // Zoho stays the source of truth; the app never marks anyone a member itself.
+  const founder_id = d.founder_id;
+  if (!founder_id) {
+    return { error: "Please sign in first so we know whose membership to check.", status: 400 };
+  }
+  const row = await refresh_membership(founder_id);
+  if (!row) return { error: "We couldn't find your account.", status: 404 };
+  const pub = _public_founder(row) || {};
+  if (pub.is_member) {
+    notify("membership_confirmed", [pub.email || ""],
+      "Your TiE Bangalore membership is confirmed",
+      "Thanks " + (pub.name || "") + " — we've confirmed your TiE Bangalore " +
+      "membership with our records. Your VentureReady expert review is now included.",
+      "normal");
+    notify("membership_confirmed_admin", ["admins"],
+      "New TiE member confirmed: " + (pub.name || pub.email || ""),
+      (pub.name || pub.email || "A founder") +
+      " completed TiE Bangalore membership and it is now confirmed in Zoho.", "normal");
+  }
+  return { founder: pub };
 }
 
 // ---- Meeting requests (TiE-facilitated introductions) ----------------------
@@ -1429,7 +1480,8 @@ async function handleGet(req, res, urlObj) {
   if (p === "/api/config") {
     // Public front-end config. Only non-secret values belong here. The Google
     // Client ID is designed to be public; the browser needs it to show the button.
-    return sendJson(res, 200, { googleClientId: GOOGLE_CLIENT_ID });
+    return sendJson(res, 200, { googleClientId: GOOGLE_CLIENT_ID,
+      membershipUrl: TIE_MEMBERSHIP_URL });
   }
   if (p === "/api/support") return sendJson(res, 200, support_list());
   if (p === "/api/review") {
@@ -1639,6 +1691,11 @@ async function handlePost(req, res, urlObj, data) {
       data.decision || "", data.reason || "");
     if (out.error) return sendJson(res, out.status || 400, { error: out.error });
     return sendJson(res, 200, out);
+  } else if (p === "/api/membership/handoff") {
+    return sendJson(res, 200, membership_handoff(data));
+  } else if (p === "/api/membership/recheck") {
+    const out = await membership_recheck(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
   } else if (p === "/api/investor/invite") {
     const out = investor_invite(data);
     return sendJson(res, out.error ? (out.status || 400) : 200, out);
