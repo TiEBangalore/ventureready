@@ -880,15 +880,15 @@ function membership_handoff(d) {
   const fb = founder_id ? _founder_brief(founder_id) : {};
   const email = (d.email || fb.email || "").trim().toLowerCase();
   const name = (d.name || fb.name || "").trim();
-  const tier = (d.tier || "Associate Membership").trim();
+  const tier = (d.tier || "Associate Member").trim();
   // Only tell admins when we know WHO set out to join — an alert naming nobody
   // can't be followed up on, so it would just be noise in the feed.
   if (!email && !name) return { ok: true, recorded: false };
   notify("membership_handoff", ["admins"],
     "Founder started joining TiE: " + (name || email),
-    (name || email) + " opened the TiE Bangalore membership page to buy " + tier +
-    ". Nothing is confirmed until their membership record exists — the app re-checks " +
-    "it when they come back, so follow up if it never appears.", "normal");
+    (name || email) + " opened the TiE Bangalore membership form to apply as " + tier +
+    ". Their application still has to be received and activated by TiE — the app re-checks " +
+    "membership when they come back, so follow up if it never appears.", "normal");
   return { ok: true, recorded: true };
 }
 

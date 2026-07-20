@@ -3503,35 +3503,40 @@ function unflagConflict(founder, el){
         <div class="nav-sep"></div>
         <span style="font-size:15px;font-weight:900;letter-spacing:-0.3px;color:var(--dark);">Venture<span style="color:var(--red);">Ready</span></span>
       </div>
-      <div style="font-size:12px;color:var(--mid);margin-bottom:20px;">Membership is handled on the TiE Bangalore membership page</div>
+      <div style="font-size:12px;color:var(--mid);margin-bottom:20px;">Membership is handled by TiE Bangalore directly</div>
 
       <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;">Join TiE Bangalore</h1>
-      <p class="sub" style="margin-bottom:20px;">Membership is managed by TiE Bangalore directly, so you'll finish this on their membership page. We'll confirm it here as soon as it's active.</p>
+      <p class="sub" style="margin-bottom:20px;">You'll complete a short membership application on TiE Bangalore's own form. Once TiE activates your membership, we'll confirm it here automatically.</p>
 
       <div style="border:1.5px solid var(--red);border-radius:10px;overflow:hidden;margin-bottom:18px;">
         <div style="background:var(--red-bg);padding:12px 16px;border-bottom:1px solid var(--border);">
           <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--red);">Choose this option</div>
-          <div style="font-size:16px;font-weight:800;color:var(--dark);margin-top:2px;">Associate Membership — ₹10,000 + GST / year</div>
+          <div style="font-size:16px;font-weight:800;color:var(--dark);margin-top:2px;">Associate Member — ₹10,000 + GST / year</div>
         </div>
         <div style="padding:14px 16px;font-size:13px;color:var(--dark);line-height:1.65;">
-          The membership page lists several categories in a drop-down. For founders using VentureReady, pick <strong>Associate Membership</strong>. It includes your expert review, the full TiE network, funding pathways and every TiE programme.
+          On the form, under <strong>Membership Category</strong>, choose <strong>Associate Member</strong>. The list also offers Charter Member, Hypergrowth Circle, NxtGen and Student Member — those aren't the founder track. <em>Chapter Name is already filled in as TiE Bangalore for you.</em>
         </div>
       </div>
 
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:6px;">What happens next</div>
         <div style="font-size:13px;color:var(--dark);line-height:1.7;">
-          1. The membership page opens in a new tab — VentureReady stays open here.<br>
-          2. Select <strong>Associate Membership</strong> and complete your payment there.<br>
-          3. Come back to this tab and press <strong>“I've joined — check my membership”</strong>.
+          1. The TiE membership form opens in a new tab — VentureReady stays open here.<br>
+          2. Under <strong>Membership Category</strong> pick <strong>Associate Member</strong>, then fill in the starred fields (name, email, mobile, LinkedIn, company, domain) and submit.<br>
+          3. TiE Bangalore processes your application and activates your membership.<br>
+          4. Come back to this tab and press <strong>“I've joined — check my membership”</strong>.
         </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--mid);line-height:1.6;">
+        Use the <strong>same email address</strong> you signed up to VentureReady with — that's how we match your membership back to your account.
       </div>
 
       <div id="membership-link-missing" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--dark);line-height:1.6;">
         The membership link hasn't been set up yet. Please email <strong>admin.blr@tiebangalore.org</strong> and the team will send you the joining link directly.
       </div>
 
-      <button class="btn btn-red btn-full btn-lg" id="membership-open-btn" onclick="openMembershipPage(this)">Open the TiE membership page →</button>
+      <button class="btn btn-red btn-full btn-lg" id="membership-open-btn" onclick="openMembershipPage(this)">Open the TiE membership form →</button>
       <button class="btn btn-outline btn-full" style="margin-top:10px" onclick="recheckMembership(this)">I've joined — check my membership</button>
       <div id="membership-recheck-msg" style="display:none;font-size:13px;margin-top:12px;line-height:1.6;"></div>
       <button class="btn btn-dark btn-full" style="margin-top:10px" onclick="go(membershipCtx.next||'interview')">Skip for now →</button>
@@ -3714,7 +3719,9 @@ async function recheckMembership(btn){
       show('We couldn\'t reach TiE\'s membership records just now, so we can\'t confirm yet. Please try again shortly.','warn');
     }else{
       show('We can\'t see an active membership for '+_escapeHtml(f.email||'your account')+' yet. '+
-        'It can take a little while to appear after payment — try again in a few minutes, or email admin.blr@tiebangalore.org if it doesn\'t show up.','warn');
+        'TiE reviews each application before activating it, so this can take a little while — check '+
+        'back later, or email admin.blr@tiebangalore.org if it doesn\'t appear. Make sure you applied '+
+        'using this same email address.','warn');
     }
   }catch(e){
     if(btn){ btn.disabled=false; btn.textContent='I\'ve joined — check my membership'; }

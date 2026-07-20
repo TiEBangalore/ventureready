@@ -911,16 +911,16 @@ def membership_handoff(d):
     fb = _founder_brief(founder_id) if founder_id else {}
     email = (d.get("email") or fb.get("email") or "").strip().lower()
     name = (d.get("name") or fb.get("name") or "").strip()
-    tier = (d.get("tier") or "Associate Membership").strip()
+    tier = (d.get("tier") or "Associate Member").strip()
     # Only tell admins when we know WHO set out to join — an alert naming nobody
     # can't be followed up on, so it would just be noise in the feed.
     if not (email or name):
         return {"ok": True, "recorded": False}
     notify("membership_handoff", ["admins"],
            "Founder started joining TiE: " + (name or email),
-           (name or email) + " opened the TiE Bangalore membership page to buy " + tier +
-           ". Nothing is confirmed until their membership record exists — the app re-checks "
-           "it when they come back, so follow up if it never appears.", "normal")
+           (name or email) + " opened the TiE Bangalore membership form to apply as " + tier +
+           ". Their application still has to be received and activated by TiE — the app re-checks "
+           "membership when they come back, so follow up if it never appears.", "normal")
     return {"ok": True, "recorded": True}
 
 def membership_recheck(d):
