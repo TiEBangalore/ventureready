@@ -933,9 +933,9 @@ def membership_handoff(d):
         return {"ok": True, "recorded": False}
     notify("membership_handoff", ["admins"],
            "Founder started joining TiE: " + (name or email),
-           (name or email) + " opened the TiE Bangalore membership form to apply as " + tier +
-           ". Their application still has to be received and activated by TiE — the app re-checks "
-           "membership when they come back, so follow up if it never appears.", "normal")
+           (name or email) + " opened the TiE Bangalore membership form to join as " + tier +
+           ". They're recognised as a member as soon as they finish; the app re-checks when they "
+           "come back, so follow up if it never appears.", "normal")
     return {"ok": True, "recorded": True}
 
 def membership_recheck(d):

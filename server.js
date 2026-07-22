@@ -901,9 +901,9 @@ function membership_handoff(d) {
   if (!email && !name) return { ok: true, recorded: false };
   notify("membership_handoff", ["admins"],
     "Founder started joining TiE: " + (name || email),
-    (name || email) + " opened the TiE Bangalore membership form to apply as " + tier +
-    ". Their application still has to be received and activated by TiE — the app re-checks " +
-    "membership when they come back, so follow up if it never appears.", "normal");
+    (name || email) + " opened the TiE Bangalore membership form to join as " + tier +
+    ". They're recognised as a member as soon as they finish; the app re-checks when they " +
+    "come back, so follow up if it never appears.", "normal");
   return { ok: true, recorded: true };
 }
 

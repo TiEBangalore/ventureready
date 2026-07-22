@@ -3593,7 +3593,7 @@ function unflagConflict(founder, el){
       <div style="font-size:12px;color:var(--mid);margin-bottom:20px;">Membership is handled by TiE Bangalore directly</div>
 
       <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;">Join TiE Bangalore</h1>
-      <p class="sub" style="margin-bottom:20px;">You'll complete a short membership application on TiE Bangalore's own form. Once TiE activates your membership, we'll confirm it here automatically.</p>
+      <p class="sub" style="margin-bottom:20px;">You'll join through TiE Bangalore's own membership form. As soon as you're through, we'll confirm your membership here automatically.</p>
 
       <div style="border:1.5px solid var(--red);border-radius:10px;overflow:hidden;margin-bottom:18px;">
         <div style="background:var(--red-bg);padding:12px 16px;border-bottom:1px solid var(--border);">
@@ -3609,8 +3609,8 @@ function unflagConflict(founder, el){
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:6px;">What happens next</div>
         <div style="font-size:13px;color:var(--dark);line-height:1.7;">
           1. The TiE membership form opens in a new tab — VentureReady stays open here.<br>
-          2. Under <strong>Membership Category</strong> pick <strong>Associate Member</strong>, then fill in the starred fields (name, email, mobile, LinkedIn, company, domain) and submit.<br>
-          3. TiE Bangalore processes your application and activates your membership.<br>
+          2. Under <strong>Membership Category</strong> pick <strong>Associate Member</strong>, then fill in the starred fields (name, email, mobile, LinkedIn, company, domain).<br>
+          3. Complete the payment steps that follow — you're recognised as a member as soon as you're done.<br>
           4. Come back to this tab and press <strong>“I've joined — check my membership”</strong>.
         </div>
       </div>
@@ -3806,9 +3806,9 @@ async function recheckMembership(btn){
       show('We couldn\'t reach TiE\'s membership records just now, so we can\'t confirm yet. Please try again shortly.','warn');
     }else{
       show('We can\'t see an active membership for '+_escapeHtml(f.email||'your account')+' yet. '+
-        'TiE reviews each application before activating it, so this can take a little while — check '+
-        'back later, or email admin.blr@tiebangalore.org if it doesn\'t appear. Make sure you applied '+
-        'using this same email address.','warn');
+        'Membership is usually recognised right away — if you\'ve just finished, give it a moment and '+
+        'check again. Still nothing? Make sure you joined with this same email address, or email '+
+        'admin.blr@tiebangalore.org.','warn');
     }
   }catch(e){
     if(btn){ btn.disabled=false; btn.textContent='I\'ve joined — check my membership'; }
