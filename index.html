@@ -3564,7 +3564,7 @@ function unflagConflict(founder, el){
 
     <div id="impact-funnel" style="margin:8px 0 24px;"></div>
 
-    <p style="font-size:12px;color:var(--grey);text-align:center;line-height:1.6;max-width:640px;margin:0 auto 32px;">
+    <p id="impact-footnote" style="font-size:12px;color:var(--grey);text-align:center;line-height:1.6;max-width:640px;margin:0 auto 32px;">
       Capital enabled reflects only closed investments where both the founder and the investor consented to inclusion, with a disclosed amount. Deals closed without a shared amount are counted separately and never estimated.
     </p>
 
@@ -5670,35 +5670,59 @@ async function loadImpact(){
   var hero=document.getElementById('impact-hero');
   var grid=document.getElementById('impact-grid');
   var funnel=document.getElementById('impact-funnel');
+  var foot=document.getElementById('impact-footnote');
+  function hide(el){ if(el){ el.style.display='none'; if(el!==foot) el.innerHTML=''; } }
+  function show(el){ if(el) el.style.display=''; }
   try{
-    var r=await fetch('/api/impact');
-    var s=await r.json();
+    var s=await (await fetch('/api/impact')).json();
+    var hasActivity=(s.introductions||0) > 0;
+    var hasCapital=(s.capital_enabled_inr||0) > 0;
+    var undis=s.closings_amount_undisclosed||0;
+
+    // ── Hero — never a bare ₹0 ──────────────────────────────────────────
     if(hero){
-      var undis = s.closings_amount_undisclosed||0;
-      hero.innerHTML='<div style="font-size:44px;font-weight:900;color:var(--red);letter-spacing:-1px;">'+_inr(s.capital_enabled_inr||0)+'</div>'+
-        '<div style="font-size:14px;color:var(--dark);font-weight:600;">capital enabled into TiE founders</div>'+
-        (undis?('<div style="font-size:12px;color:var(--grey);margin-top:4px;">plus '+undis+' more closed investment'+(undis===1?'':'s')+' with amounts kept private</div>'):'');
+      if(hasCapital){
+        hero.innerHTML='<div style="font-size:44px;font-weight:900;color:var(--red);letter-spacing:-1px;">'+_inr(s.capital_enabled_inr)+'</div>'+
+          '<div style="font-size:14px;color:var(--dark);font-weight:600;">capital enabled into TiE founders</div>'+
+          (undis?('<div style="font-size:12px;color:var(--grey);margin-top:4px;">plus '+undis+' more closed investment'+(undis===1?'':'s')+' with amounts kept private</div>'):'');
+      }else if(hasActivity){
+        hero.innerHTML='<div style="font-size:26px;font-weight:800;color:var(--dark);">'+s.introductions+' founder–investor '+(s.introductions===1?'introduction':'introductions')+' in motion</div>'+
+          '<div style="font-size:13px;color:var(--grey);margin:6px auto 0;max-width:520px;">The capital TiE enables will appear here as these conversations reach a close.</div>';
+      }else{
+        hero.innerHTML='<div style="font-size:22px;font-weight:800;color:var(--dark);">Impact figures are on the way</div>'+
+          '<div style="font-size:13px;color:var(--grey);margin:6px auto 0;max-width:520px;">As VentureReady founders meet screened investors and close rounds, the introductions, meetings and capital TiE has enabled will be tracked and shown here.</div>';
+      }
     }
+
+    // ── Tiles — only render metrics that are non-zero ───────────────────
     if(grid){
-      grid.innerHTML=
-        _impactTile(s.closed||0, 'investments closed')+
-        _impactTile(s.startups_backed||0, 'startups backed')+
-        _impactTile(s.investors_active||0, 'active investors')+
-        _impactTile(s.introductions||0, 'introductions made');
+      var tiles=[[s.closed||0,'investments closed'],[s.startups_backed||0,'startups backed'],
+                 [s.investors_active||0,'active investors'],[s.introductions||0,'introductions made']]
+                .filter(function(t){ return t[0]>0; });
+      if(tiles.length){ show(grid); grid.innerHTML=tiles.map(function(t){ return _impactTile(t[0],t[1]); }).join(''); }
+      else{ hide(grid); }
     }
+
+    // ── Funnel — only once there's real pipeline ────────────────────────
     if(funnel){
-      var steps=[['Introduced',s.introductions||0],['Met',s.meetings||0],['Diligence+',s.in_diligence_plus||0],['Closed',s.closed||0]];
-      var max=Math.max(1, s.introductions||0);
-      var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--grey);margin-bottom:10px;text-align:center;">From introduction to investment</div>';
-      steps.forEach(function(st){
-        var pct=Math.round((st[1]/max)*100);
-        html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'+
-          '<div style="width:90px;font-size:12px;color:var(--dark);text-align:right;">'+st[0]+'</div>'+
-          '<div style="flex:1;background:var(--surface);border-radius:6px;overflow:hidden;height:22px;"><div style="width:'+Math.max(pct,3)+'%;height:100%;background:var(--red);"></div></div>'+
-          '<div style="width:40px;font-size:13px;font-weight:700;color:var(--dark);">'+st[1]+'</div></div>';
-      });
-      funnel.innerHTML=html;
+      if(hasActivity){
+        show(funnel);
+        var steps=[['Introduced',s.introductions||0],['Met',s.meetings||0],['Diligence+',s.in_diligence_plus||0],['Closed',s.closed||0]];
+        var max=Math.max(1, s.introductions||0);
+        var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--grey);margin-bottom:10px;text-align:center;">From introduction to investment</div>';
+        steps.forEach(function(st){
+          var pct=Math.round((st[1]/max)*100);
+          html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'+
+            '<div style="width:90px;font-size:12px;color:var(--dark);text-align:right;">'+st[0]+'</div>'+
+            '<div style="flex:1;background:var(--surface);border-radius:6px;overflow:hidden;height:22px;"><div style="width:'+Math.max(pct,3)+'%;height:100%;background:var(--red);"></div></div>'+
+            '<div style="width:40px;font-size:13px;font-weight:700;color:var(--dark);">'+st[1]+'</div></div>';
+        });
+        funnel.innerHTML=html;
+      }else{ hide(funnel); }
     }
+
+    // ── Footnote — only meaningful once a ₹ figure is shown ─────────────
+    if(hasCapital) show(foot); else hide(foot);
   }catch(e){ if(hero) hero.innerHTML='<div style="font-size:13px;color:var(--red);">Could not load impact figures right now.</div>'; }
 }
 function _impactTile(value, label){
