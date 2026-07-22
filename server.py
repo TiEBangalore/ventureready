@@ -122,6 +122,21 @@ def db_init():
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
         startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
         status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)""")
+    # Deals: one founder<->investor relationship tracked from introduction to
+    # outcome. This is the substrate for TiE's impact reporting. stage walks:
+    # 'introduced' -> 'met' -> 'diligence' -> 'term_sheet' -> 'closed' | 'passed'.
+    # amount_inr is optional (a deal can be 'closed' with amount undisclosed).
+    # founder_confirmed / investor_confirmed record TWO-SIDED attestation of the
+    # current stage; tie_verified is TiE's own spot-check. *_consent_public gate
+    # whether the deal may EVER feed public/anonymised impact figures.
+    conn.execute("""CREATE TABLE IF NOT EXISTS deal(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
+        startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT, firm TEXT,
+        stage TEXT DEFAULT 'introduced', amount_inr INTEGER, amount_disclosed INTEGER DEFAULT 0,
+        founder_consent_public INTEGER DEFAULT 0, investor_consent_public INTEGER DEFAULT 0,
+        founder_confirmed INTEGER DEFAULT 0, investor_confirmed INTEGER DEFAULT 0,
+        tie_verified INTEGER DEFAULT 0, source TEXT, meeting_id INTEGER, note TEXT,
+        created_at TEXT, updated_at TEXT, closed_at TEXT)""")
     conn.commit()
     if conn.execute("SELECT COUNT(*) c FROM support").fetchone()["c"] == 0:
         seeds = [
@@ -1027,6 +1042,257 @@ def meeting_intro_sent(id_token, meeting_id):
            (row["founder_name"] or "the founder") + " as sent.", "normal")
     return {"ok": True, "meetings": meeting_list(id_token).get("meetings", [])}
 
+# ---- Deals & impact (attributable investment tracking) --------------------
+# The funnel a founder<->investor relationship walks. 'passed' is a dead end
+# (deal died); the rest are forward progress ending in 'closed' (an investment).
+DEAL_STAGES = ["introduced", "met", "diligence", "term_sheet", "closed", "passed"]
+# Progress order for "reached at least X" counting (excludes the dead-end).
+DEAL_PROGRESS = ["introduced", "met", "diligence", "term_sheet", "closed"]
+
+def _deal_confidence(founder_confirmed, investor_confirmed, tie_verified):
+    # How much weight an outcome can carry. TiE's own check outranks self-report;
+    # both sides agreeing outranks one; one outranks none.
+    if tie_verified:
+        return "tie_verified"
+    if founder_confirmed and investor_confirmed:
+        return "both_confirmed"
+    if founder_confirmed or investor_confirmed:
+        return "one_confirmed"
+    return "unconfirmed"
+
+def _deal_row(r):
+    if r is None:
+        return None
+    fc, ic, tv = bool(r["founder_confirmed"]), bool(r["investor_confirmed"]), bool(r["tie_verified"])
+    return {"id": r["id"], "founder_id": r["founder_id"], "founder_name": r["founder_name"] or "",
+            "startup": r["startup"] or "", "investor_id": r["investor_id"],
+            "investor_name": r["investor_name"] or "", "investor_email": r["investor_email"] or "",
+            "firm": r["firm"] or "", "stage": r["stage"] or "introduced",
+            "amount_inr": r["amount_inr"], "amount_disclosed": bool(r["amount_disclosed"]),
+            "founder_consent_public": bool(r["founder_consent_public"]),
+            "investor_consent_public": bool(r["investor_consent_public"]),
+            "founder_confirmed": fc, "investor_confirmed": ic, "tie_verified": tv,
+            "confidence": _deal_confidence(fc, ic, tv),
+            "created_at": r["created_at"] or "", "updated_at": r["updated_at"] or "",
+            "closed_at": r["closed_at"] or "", "note": r["note"] or ""}
+
+def deal_create(d):
+    # Open a deal between a founder and an investor. Reuses an existing OPEN deal
+    # for the same pair rather than creating duplicates.
+    founder_id = d.get("founder_id")
+    fb = _founder_brief(founder_id) if founder_id else {}
+    founder_name = (d.get("founder_name") or fb.get("name") or "").strip()
+    startup = (d.get("startup") or fb.get("company") or "").strip()
+    investor_email = (d.get("investor_email") or "").strip().lower()
+    investor_name = (d.get("investor_name") or "").strip()
+    investor_id, firm = d.get("investor_id"), (d.get("firm") or "").strip()
+    conn = _db()
+    if investor_email:
+        inv = conn.execute("SELECT * FROM investor WHERE email=?", (investor_email,)).fetchone()
+        if inv:
+            investor_id = inv["id"]; investor_name = investor_name or (inv["name"] or "")
+            firm = firm or (inv["firm"] or "")
+    if not founder_name and not startup:
+        conn.close()
+        return {"error": "A deal needs a founder.", "status": 400}
+    if not (investor_email or investor_name):
+        conn.close()
+        return {"error": "A deal needs an investor.", "status": 400}
+    # Reuse an open deal for the same pair (don't double-count the same relationship).
+    existing = conn.execute(
+        "SELECT * FROM deal WHERE founder_id IS ? AND investor_email=? "
+        "AND stage NOT IN ('closed','passed') ORDER BY id DESC LIMIT 1",
+        (founder_id, investor_email)).fetchone()
+    if existing:
+        row = _deal_row(existing); conn.close()
+        return {"deal": row, "reused": True}
+    cur = conn.execute(
+        "INSERT INTO deal(founder_id, founder_name, startup, investor_id, investor_name, "
+        "investor_email, firm, stage, source, meeting_id, created_at, updated_at) "
+        "VALUES(?,?,?,?,?,?,?, 'introduced', ?, ?, datetime('now'), datetime('now'))",
+        (founder_id, founder_name, startup, investor_id, investor_name, investor_email, firm,
+         d.get("source") or "manual", d.get("meeting_id")))
+    did = cur.lastrowid
+    conn.commit()
+    row = _deal_row(conn.execute("SELECT * FROM deal WHERE id=?", (did,)).fetchone())
+    conn.close()
+    notify("deal_created", ["admins"],
+           "New deal tracked: " + (investor_name or investor_email or "investor") + " → " +
+           (startup or founder_name),
+           "A deal between " + (investor_name or investor_email or "an investor") + " and " +
+           (startup or founder_name) + " is now being tracked toward outcome.", "normal")
+    return {"deal": row, "reused": False}
+
+def deal_advance(d):
+    # Move a deal along, and/or record an amount + public-consent, attributed to
+    # whoever acted. When a party changes the stage, the OTHER party's prior
+    # confirmation is cleared so they must re-attest the new stage (keeps the
+    # two-sided signal honest); an admin stage change clears both.
+    deal_id = d.get("deal_id")
+    actor = (d.get("actor") or "").strip().lower()   # 'founder' | 'investor' | 'admin'
+    conn = _db()
+    row = conn.execute("SELECT * FROM deal WHERE id=?", (deal_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "Unknown deal.", "status": 404}
+    cur = dict(row)
+    new_stage = (d.get("stage") or cur["stage"] or "introduced").strip()
+    if new_stage not in DEAL_STAGES:
+        conn.close()
+        return {"error": "Unknown stage.", "status": 400}
+    stage_changed = new_stage != (cur["stage"] or "introduced")
+    fc, ic, tv = cur["founder_confirmed"], cur["investor_confirmed"], cur["tie_verified"]
+    fcp, icp = cur["founder_consent_public"], cur["investor_consent_public"]
+    # Attribution + consent for the acting party.
+    consent = d.get("consent_public")
+    if actor == "founder":
+        fc = 1
+        if consent is not None:
+            fcp = 1 if consent else 0
+    elif actor == "investor":
+        ic = 1
+        if consent is not None:
+            icp = 1 if consent else 0
+    # If the stage moved, stale the confirmations that no longer apply.
+    if stage_changed:
+        if actor == "founder":
+            ic = 0; tv = 0
+        elif actor == "investor":
+            fc = 0; tv = 0
+        else:  # admin recorded the stage — both parties should re-attest it
+            fc = 0; ic = 0
+    amount_inr, amount_disclosed = cur["amount_inr"], cur["amount_disclosed"]
+    if d.get("amount_inr") not in (None, ""):
+        try:
+            amount_inr = int(d.get("amount_inr")); amount_disclosed = 1
+        except (ValueError, TypeError):
+            conn.close()
+            return {"error": "Amount must be a whole number of rupees.", "status": 400}
+    closed_at = cur["closed_at"]
+    if new_stage == "closed" and not closed_at:
+        closed_at = None  # set via SQL below
+    conn.execute(
+        "UPDATE deal SET stage=?, amount_inr=?, amount_disclosed=?, founder_consent_public=?, "
+        "investor_consent_public=?, founder_confirmed=?, investor_confirmed=?, tie_verified=?, "
+        "note=COALESCE(?, note), updated_at=datetime('now'), "
+        "closed_at=CASE WHEN ?='closed' AND closed_at IS NULL THEN datetime('now') ELSE closed_at END "
+        "WHERE id=?",
+        (new_stage, amount_inr, amount_disclosed, fcp, icp, fc, ic, tv,
+         d.get("note"), new_stage, deal_id))
+    conn.commit()
+    fresh = _deal_row(conn.execute("SELECT * FROM deal WHERE id=?", (deal_id,)).fetchone())
+    conn.close()
+    # Nudge the OTHER party to confirm, and flag closures to admins (that's impact).
+    label = (fresh["startup"] or fresh["founder_name"]) + " ↔ " + (fresh["investor_name"] or fresh["investor_email"] or "investor")
+    if new_stage == "closed":
+        notify("deal_closed", ["admins"], "Deal closed: " + label,
+               "A deal has been marked closed: " + label +
+               (". Amount: ₹%s" % fresh["amount_inr"] if fresh["amount_disclosed"] and fresh["amount_inr"] else
+                ". Amount undisclosed.") + " Confidence: " + fresh["confidence"] + ".", "high")
+    elif stage_changed:
+        # ask the party who did NOT just act to confirm
+        if actor == "founder" and fresh["investor_email"]:
+            notify("deal_update_confirm", [fresh["investor_email"]],
+                   "Please confirm a deal update", "The status of your deal (" + label +
+                   ") was updated to '" + new_stage.replace("_", " ") +
+                   "'. Please confirm it so TiE's records stay accurate.", "normal")
+        elif actor == "investor" and fresh["founder_id"]:
+            fb2 = _founder_brief(fresh["founder_id"])
+            if fb2.get("email"):
+                notify("deal_update_confirm", [fb2["email"]],
+                       "Please confirm a deal update", "The status of your deal (" + label +
+                       ") was updated to '" + new_stage.replace("_", " ") +
+                       "'. Please confirm it so TiE's records stay accurate.", "normal")
+    return {"deal": fresh}
+
+def deal_verify(id_token, deal_id, verified=True):
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    conn = _db()
+    row = conn.execute("SELECT * FROM deal WHERE id=?", (deal_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "Unknown deal.", "status": 404}
+    conn.execute("UPDATE deal SET tie_verified=?, updated_at=datetime('now') WHERE id=?",
+                 (1 if verified else 0, deal_id))
+    conn.commit()
+    fresh = _deal_row(conn.execute("SELECT * FROM deal WHERE id=?", (deal_id,)).fetchone())
+    conn.close()
+    return {"deal": fresh}
+
+def deals_for(founder_id=None, investor_email=None):
+    # A single party's own deals (their private view).
+    conn = _db()
+    if founder_id:
+        rows = conn.execute("SELECT * FROM deal WHERE founder_id=? ORDER BY id DESC", (founder_id,)).fetchall()
+    elif investor_email:
+        rows = conn.execute("SELECT * FROM deal WHERE investor_email=? ORDER BY id DESC",
+                            ((investor_email or "").strip().lower(),)).fetchall()
+    else:
+        rows = []
+    conn.close()
+    return [_deal_row(r) for r in rows]
+
+def deals_admin(id_token):
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    conn = _db()
+    rows = [_deal_row(r) for r in conn.execute("SELECT * FROM deal ORDER BY id DESC").fetchall()]
+    conn.close()
+    # Funnel + capital, for TiE's own (full) view.
+    by_stage = {s: 0 for s in DEAL_STAGES}
+    conf = {"tie_verified": 0, "both_confirmed": 0, "one_confirmed": 0, "unconfirmed": 0}
+    capital_disclosed = 0
+    undisclosed_closed = 0
+    closed = [r for r in rows if r["stage"] == "closed"]
+    for r in rows:
+        by_stage[r["stage"]] = by_stage.get(r["stage"], 0) + 1
+    for r in closed:
+        conf[r["confidence"]] = conf.get(r["confidence"], 0) + 1
+        if r["amount_disclosed"] and r["amount_inr"]:
+            capital_disclosed += r["amount_inr"]
+        else:
+            undisclosed_closed += 1
+    stats = {"total": len(rows), "by_stage": by_stage, "closed": len(closed),
+             "capital_disclosed_inr": capital_disclosed, "undisclosed_closed": undisclosed_closed,
+             "confidence": conf,
+             "founders": len({r["founder_id"] for r in rows if r["founder_id"]}),
+             "investors": len({r["investor_email"] for r in rows if r["investor_email"]})}
+    return {"deals": rows, "stats": stats}
+
+def impact_public():
+    # PUBLIC, showcase-safe aggregates ONLY. No names, no individual amounts.
+    # The ₹ headline counts a closed deal ONLY when an amount was disclosed AND
+    # both parties consented to public inclusion — everything else is a count.
+    conn = _db()
+    rows = [_deal_row(r) for r in conn.execute("SELECT * FROM deal").fetchall()]
+    conn.close()
+    def reached(stage_name):
+        idx = DEAL_PROGRESS.index(stage_name)
+        n = 0
+        for r in rows:
+            if r["stage"] in DEAL_PROGRESS and DEAL_PROGRESS.index(r["stage"]) >= idx:
+                n += 1
+        return n
+    closed = [r for r in rows if r["stage"] == "closed"]
+    capital_public = 0
+    public_closings = 0
+    for r in closed:
+        if (r["amount_disclosed"] and r["amount_inr"]
+                and r["founder_consent_public"] and r["investor_consent_public"]):
+            capital_public += r["amount_inr"]
+            public_closings += 1
+    return {"introductions": len(rows), "meetings": reached("met"),
+            "in_diligence_plus": reached("diligence"), "closed": len(closed),
+            "startups_backed": len({r["founder_id"] for r in closed if r["founder_id"]}),
+            "investors_active": len({r["investor_email"] for r in rows
+                                     if r["investor_email"] and r["stage"] != "introduced"}),
+            "capital_enabled_inr": capital_public,
+            "capital_from_deals": public_closings,
+            "closings_amount_undisclosed": len(closed) - public_closings}
+
 CHAPTER = "TiE Bangalore"
 
 # ---- Zoho token cache (token lives 1 hour) ----
@@ -1489,6 +1755,15 @@ class Handler(BaseHTTPRequestHandler):
             fid = (qs.get("id") or [""])[0]
             rec = founder_get(fid) if fid else None
             return self._send(200, rec or {"error": "not found"})
+        if path == "/api/deals":
+            # A single party's own deals (their private view).
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            fid = (qs.get("founder_id") or [""])[0]
+            iem = (qs.get("investor_email") or [""])[0]
+            return self._send(200, {"deals": deals_for(fid or None, iem or None)})
+        if path == "/api/impact":
+            # PUBLIC, showcase-safe aggregates only (no names, no individual amounts).
+            return self._send(200, impact_public())
         fp = os.path.join(HERE, path.lstrip("/"))
         if os.path.isfile(fp) and os.path.abspath(fp).startswith(HERE):
             ctype = "text/html" if fp.endswith(".html") else "application/octet-stream"
@@ -1651,6 +1926,25 @@ class Handler(BaseHTTPRequestHandler):
                         ) + (result.get("summary") or "")
                     result["deck_id"] = deck_id
                     self._send(200, result)
+            elif self.path == "/api/deal/create":
+                out = deal_create(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/deal/advance":
+                out = deal_advance(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/deal/verify":
+                out = deal_verify(data.get("credential", ""), data.get("deal_id"),
+                                  data.get("verified", True))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/admin/deals":
+                out = deals_admin(data.get("credential", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 403), {"error": out["error"]})
+                else:
+                    self._send(200, out)
             elif self.path == "/api/support":
                 self._send(200, support_add(data))
             elif self.path == "/api/payment/record":

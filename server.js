@@ -141,6 +141,21 @@ function db_init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
       startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
       status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)`);
+  // Deals: one founder<->investor relationship tracked from introduction to
+  // outcome. This is the substrate for TiE's impact reporting. stage walks:
+  // 'introduced' -> 'met' -> 'diligence' -> 'term_sheet' -> 'closed' | 'passed'.
+  // amount_inr is optional (a deal can be 'closed' with amount undisclosed).
+  // founder_confirmed / investor_confirmed record TWO-SIDED attestation of the
+  // current stage; tie_verified is TiE's own spot-check. *_consent_public gate
+  // whether the deal may EVER feed public/anonymised impact figures.
+  db.exec(`CREATE TABLE IF NOT EXISTS deal(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
+      startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT, firm TEXT,
+      stage TEXT DEFAULT 'introduced', amount_inr INTEGER, amount_disclosed INTEGER DEFAULT 0,
+      founder_consent_public INTEGER DEFAULT 0, investor_consent_public INTEGER DEFAULT 0,
+      founder_confirmed INTEGER DEFAULT 0, investor_confirmed INTEGER DEFAULT 0,
+      tie_verified INTEGER DEFAULT 0, source TEXT, meeting_id INTEGER, note TEXT,
+      created_at TEXT, updated_at TEXT, closed_at TEXT)`);
   if (db.prepare("SELECT COUNT(*) c FROM support").get().c === 0) {
     const seeds = [
       ["SUP-204", "Meera Suresh", "Founder", "TiE membership verification",
@@ -992,6 +1007,202 @@ async function meeting_intro_sent(idToken, meeting_id) {
   return { ok: true, meetings: listed.meetings || [] };
 }
 
+// ---- Deals & impact (attributable investment tracking) --------------------
+// The funnel a founder<->investor relationship walks. 'passed' is a dead end
+// (deal died); the rest are forward progress ending in 'closed' (an investment).
+const DEAL_STAGES = ["introduced", "met", "diligence", "term_sheet", "closed", "passed"];
+// Progress order for "reached at least X" counting (excludes the dead-end).
+const DEAL_PROGRESS = ["introduced", "met", "diligence", "term_sheet", "closed"];
+
+function _deal_confidence(fc, ic, tv) {
+  if (tv) return "tie_verified";
+  if (fc && ic) return "both_confirmed";
+  if (fc || ic) return "one_confirmed";
+  return "unconfirmed";
+}
+
+function _deal_row(r) {
+  if (!r) return null;
+  const fc = !!r.founder_confirmed, ic = !!r.investor_confirmed, tv = !!r.tie_verified;
+  return {
+    id: r.id, founder_id: r.founder_id, founder_name: r.founder_name || "",
+    startup: r.startup || "", investor_id: r.investor_id,
+    investor_name: r.investor_name || "", investor_email: r.investor_email || "",
+    firm: r.firm || "", stage: r.stage || "introduced",
+    amount_inr: r.amount_inr, amount_disclosed: !!r.amount_disclosed,
+    founder_consent_public: !!r.founder_consent_public,
+    investor_consent_public: !!r.investor_consent_public,
+    founder_confirmed: fc, investor_confirmed: ic, tie_verified: tv,
+    confidence: _deal_confidence(fc, ic, tv),
+    created_at: r.created_at || "", updated_at: r.updated_at || "",
+    closed_at: r.closed_at || "", note: r.note || "",
+  };
+}
+
+function deal_create(d) {
+  // Open a deal between a founder and an investor. Reuses an existing OPEN deal
+  // for the same pair rather than creating duplicates.
+  const founder_id = d.founder_id;
+  const fb = founder_id ? _founder_brief(founder_id) : {};
+  const founder_name = (d.founder_name || fb.name || "").trim();
+  const startup = (d.startup || fb.company || "").trim();
+  const investor_email = (d.investor_email || "").trim().toLowerCase();
+  let investor_name = (d.investor_name || "").trim();
+  let investor_id = d.investor_id, firm = (d.firm || "").trim();
+  if (investor_email) {
+    const inv = db.prepare("SELECT * FROM investor WHERE email=?").get(investor_email);
+    if (inv) { investor_id = inv.id; investor_name = investor_name || (inv.name || ""); firm = firm || (inv.firm || ""); }
+  }
+  if (!founder_name && !startup) return { error: "A deal needs a founder.", status: 400 };
+  if (!investor_email && !investor_name) return { error: "A deal needs an investor.", status: 400 };
+  const existing = db.prepare(
+    "SELECT * FROM deal WHERE founder_id IS ? AND investor_email=? " +
+    "AND stage NOT IN ('closed','passed') ORDER BY id DESC LIMIT 1").get(founder_id, investor_email);
+  if (existing) return { deal: _deal_row(existing), reused: true };
+  const cur = db.prepare(
+    "INSERT INTO deal(founder_id, founder_name, startup, investor_id, investor_name, " +
+    "investor_email, firm, stage, source, meeting_id, created_at, updated_at) " +
+    "VALUES(?,?,?,?,?,?,?, 'introduced', ?, ?, datetime('now'), datetime('now'))"
+  ).run(founder_id, founder_name, startup, investor_id, investor_name, investor_email, firm,
+    d.source || "manual", d.meeting_id);
+  const row = _deal_row(db.prepare("SELECT * FROM deal WHERE id=?").get(cur.lastInsertRowid));
+  notify("deal_created", ["admins"],
+    "New deal tracked: " + (investor_name || investor_email || "investor") + " → " +
+    (startup || founder_name),
+    "A deal between " + (investor_name || investor_email || "an investor") + " and " +
+    (startup || founder_name) + " is now being tracked toward outcome.", "normal");
+  return { deal: row, reused: false };
+}
+
+function deal_advance(d) {
+  // Move a deal along, and/or record an amount + public-consent, attributed to
+  // whoever acted. When a party changes the stage, the OTHER party's prior
+  // confirmation is cleared so they must re-attest the new stage; an admin
+  // stage change clears both.
+  const deal_id = d.deal_id;
+  const actor = (d.actor || "").trim().toLowerCase();
+  const cur = db.prepare("SELECT * FROM deal WHERE id=?").get(deal_id);
+  if (!cur) return { error: "Unknown deal.", status: 404 };
+  const new_stage = (d.stage || cur.stage || "introduced").trim();
+  if (!DEAL_STAGES.includes(new_stage)) return { error: "Unknown stage.", status: 400 };
+  const stage_changed = new_stage !== (cur.stage || "introduced");
+  let fc = cur.founder_confirmed, ic = cur.investor_confirmed, tv = cur.tie_verified;
+  let fcp = cur.founder_consent_public, icp = cur.investor_consent_public;
+  const consent = d.consent_public;
+  if (actor === "founder") { fc = 1; if (consent !== undefined && consent !== null) fcp = consent ? 1 : 0; }
+  else if (actor === "investor") { ic = 1; if (consent !== undefined && consent !== null) icp = consent ? 1 : 0; }
+  if (stage_changed) {
+    if (actor === "founder") { ic = 0; tv = 0; }
+    else if (actor === "investor") { fc = 0; tv = 0; }
+    else { fc = 0; ic = 0; }
+  }
+  let amount_inr = cur.amount_inr, amount_disclosed = cur.amount_disclosed;
+  if (d.amount_inr !== undefined && d.amount_inr !== null && d.amount_inr !== "") {
+    const n = Number(d.amount_inr);
+    if (!Number.isInteger(n)) return { error: "Amount must be a whole number of rupees.", status: 400 };
+    amount_inr = n; amount_disclosed = 1;
+  }
+  db.prepare(
+    "UPDATE deal SET stage=?, amount_inr=?, amount_disclosed=?, founder_consent_public=?, " +
+    "investor_consent_public=?, founder_confirmed=?, investor_confirmed=?, tie_verified=?, " +
+    "note=COALESCE(?, note), updated_at=datetime('now'), " +
+    "closed_at=CASE WHEN ?='closed' AND closed_at IS NULL THEN datetime('now') ELSE closed_at END " +
+    "WHERE id=?"
+  ).run(new_stage, amount_inr, amount_disclosed, fcp, icp, fc, ic, tv,
+    (d.note === undefined ? null : d.note), new_stage, deal_id);
+  const fresh = _deal_row(db.prepare("SELECT * FROM deal WHERE id=?").get(deal_id));
+  const label = (fresh.startup || fresh.founder_name) + " ↔ " + (fresh.investor_name || fresh.investor_email || "investor");
+  if (new_stage === "closed") {
+    notify("deal_closed", ["admins"], "Deal closed: " + label,
+      "A deal has been marked closed: " + label +
+      (fresh.amount_disclosed && fresh.amount_inr ? ". Amount: ₹" + fresh.amount_inr : ". Amount undisclosed.") +
+      " Confidence: " + fresh.confidence + ".", "high");
+  } else if (stage_changed) {
+    if (actor === "founder" && fresh.investor_email) {
+      notify("deal_update_confirm", [fresh.investor_email], "Please confirm a deal update",
+        "The status of your deal (" + label + ") was updated to '" + new_stage.replace("_", " ") +
+        "'. Please confirm it so TiE's records stay accurate.", "normal");
+    } else if (actor === "investor" && fresh.founder_id) {
+      const fb2 = _founder_brief(fresh.founder_id);
+      if (fb2.email) {
+        notify("deal_update_confirm", [fb2.email], "Please confirm a deal update",
+          "The status of your deal (" + label + ") was updated to '" + new_stage.replace("_", " ") +
+          "'. Please confirm it so TiE's records stay accurate.", "normal");
+      }
+    }
+  }
+  return { deal: fresh };
+}
+
+async function deal_verify(idToken, deal_id, verified) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  const row = db.prepare("SELECT * FROM deal WHERE id=?").get(deal_id);
+  if (!row) return { error: "Unknown deal.", status: 404 };
+  db.prepare("UPDATE deal SET tie_verified=?, updated_at=datetime('now') WHERE id=?")
+    .run(verified ? 1 : 0, deal_id);
+  return { deal: _deal_row(db.prepare("SELECT * FROM deal WHERE id=?").get(deal_id)) };
+}
+
+function deals_for(founder_id, investor_email) {
+  let rows = [];
+  if (founder_id) rows = db.prepare("SELECT * FROM deal WHERE founder_id=? ORDER BY id DESC").all(founder_id);
+  else if (investor_email) rows = db.prepare("SELECT * FROM deal WHERE investor_email=? ORDER BY id DESC")
+    .all((investor_email || "").trim().toLowerCase());
+  return rows.map(_deal_row);
+}
+
+async function deals_admin(idToken) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  const rows = db.prepare("SELECT * FROM deal ORDER BY id DESC").all().map(_deal_row);
+  const by_stage = {}; DEAL_STAGES.forEach((s) => { by_stage[s] = 0; });
+  const conf = { tie_verified: 0, both_confirmed: 0, one_confirmed: 0, unconfirmed: 0 };
+  let capital_disclosed = 0, undisclosed_closed = 0;
+  const closed = rows.filter((r) => r.stage === "closed");
+  rows.forEach((r) => { by_stage[r.stage] = (by_stage[r.stage] || 0) + 1; });
+  closed.forEach((r) => {
+    conf[r.confidence] = (conf[r.confidence] || 0) + 1;
+    if (r.amount_disclosed && r.amount_inr) capital_disclosed += r.amount_inr;
+    else undisclosed_closed += 1;
+  });
+  const stats = {
+    total: rows.length, by_stage: by_stage, closed: closed.length,
+    capital_disclosed_inr: capital_disclosed, undisclosed_closed: undisclosed_closed,
+    confidence: conf,
+    founders: new Set(rows.filter((r) => r.founder_id).map((r) => r.founder_id)).size,
+    investors: new Set(rows.filter((r) => r.investor_email).map((r) => r.investor_email)).size,
+  };
+  return { deals: rows, stats: stats };
+}
+
+function impact_public() {
+  // PUBLIC, showcase-safe aggregates ONLY. No names, no individual amounts.
+  // The ₹ headline counts a closed deal ONLY when an amount was disclosed AND
+  // both parties consented to public inclusion — everything else is a count.
+  const rows = db.prepare("SELECT * FROM deal").all().map(_deal_row);
+  const reached = (stageName) => {
+    const idx = DEAL_PROGRESS.indexOf(stageName);
+    return rows.filter((r) => DEAL_PROGRESS.includes(r.stage) && DEAL_PROGRESS.indexOf(r.stage) >= idx).length;
+  };
+  const closed = rows.filter((r) => r.stage === "closed");
+  let capital_public = 0, public_closings = 0;
+  closed.forEach((r) => {
+    if (r.amount_disclosed && r.amount_inr && r.founder_consent_public && r.investor_consent_public) {
+      capital_public += r.amount_inr; public_closings += 1;
+    }
+  });
+  return {
+    introductions: rows.length, meetings: reached("met"),
+    in_diligence_plus: reached("diligence"), closed: closed.length,
+    startups_backed: new Set(closed.filter((r) => r.founder_id).map((r) => r.founder_id)).size,
+    investors_active: new Set(rows.filter((r) => r.investor_email && r.stage !== "introduced")
+      .map((r) => r.investor_email)).size,
+    capital_enabled_inr: capital_public, capital_from_deals: public_closings,
+    closings_amount_undisclosed: closed.length - public_closings,
+  };
+}
+
 const CHAPTER = "TiE Bangalore";
 
 // ---- Zoho token cache (token lives 1 hour) ----
@@ -1497,6 +1708,14 @@ async function handleGet(req, res, urlObj) {
     const rec = fid ? founder_get(fid) : null;
     return sendJson(res, 200, rec || { error: "not found" });
   }
+  if (p === "/api/deals") {
+    const fid = urlObj.searchParams.get("founder_id") || "";
+    const iem = urlObj.searchParams.get("investor_email") || "";
+    return sendJson(res, 200, { deals: deals_for(fid || null, iem || null) });
+  }
+  if (p === "/api/impact") {
+    return sendJson(res, 200, impact_public());
+  }
   const fp = path.join(HERE, p.replace(/^\/+/, ""));
   if (fs.existsSync(fp) && fs.statSync(fp).isFile() && path.resolve(fp).startsWith(HERE)) {
     const ctype = fp.endsWith(".html") ? "text/html" : "application/octet-stream";
@@ -1665,6 +1884,20 @@ async function handlePost(req, res, urlObj, data) {
     }
     result.deck_id = deck_id;
     return sendJson(res, 200, result);
+  } else if (p === "/api/deal/create") {
+    const out = deal_create(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/deal/advance") {
+    const out = deal_advance(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/deal/verify") {
+    const out = await deal_verify(data.credential || "", data.deal_id, data.verified !== false);
+    if (out.error) return sendJson(res, out.status || 400, { error: out.error });
+    return sendJson(res, 200, out);
+  } else if (p === "/api/admin/deals") {
+    const out = await deals_admin(data.credential || "");
+    if (out.error) return sendJson(res, out.status || 403, { error: out.error });
+    return sendJson(res, 200, out);
   } else if (p === "/api/support") {
     return sendJson(res, 200, support_add(data));
   } else if (p === "/api/payment/record") {

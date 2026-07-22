@@ -666,6 +666,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <a onclick="go('home')">Home</a>
     <a onclick="go('member')">Membership</a>
     <a onclick="go('investor-apply')">For Investors</a>
+    <a onclick="go('impact')">Impact</a>
   </div>
   <!-- Logged-out state: home screen only -->
   <button class="btn btn-dark nav-cta" id="nav-auth-out" onclick="go('login')">Login / Sign up →</button>
@@ -2530,6 +2531,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
   <div class="shell">
 
+    <!-- Your founder conversations (deals you can keep up to date) -->
+    <div id="investor-deals-wrap" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Your founder conversations</div>
+      <div style="font-size:12px;color:var(--grey);line-height:1.55;margin-bottom:14px;">Keep these current so TiE can track outcomes. When you invest in a TiE founder, recording it here — with the founder confirming — is what counts it toward your verified portfolio and TiE's impact.</div>
+      <div id="investor-deals"></div>
+    </div>
+
     <!-- Tier progress -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -2741,6 +2749,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div class="stage-item s-active">⬛ Mark Active</div>
         <div class="stage-item">Investor Routing</div>
       </div>
+    </div>
+
+    <!-- Your investor conversations (deals you can keep up to date) -->
+    <div id="founder-deals-wrap" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Your investor conversations</div>
+      <div style="font-size:12px;color:var(--grey);line-height:1.55;margin-bottom:14px;">Keep these up to date so TiE can see the impact your mark is creating. If one leads to an investment, marking it here — with the investor confirming too — is what lets TiE count it.</div>
+      <div id="founder-deals"></div>
     </div>
 
     <!-- Data room: the next thing an investor asks for -->
@@ -3150,10 +3165,48 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <!-- DEAL FLOW -->
     <div id="admin-dealflow" class="admin-page">
       <div class="admin-page-hd">
-        <h1>Active Deal Flow</h1>
-        <p>All VentureReady-marked founders currently visible to screened investors.</p>
+        <h1>Deal Flow &amp; Impact</h1>
+        <p>Every founder–investor deal, tracked from introduction to outcome. This is the source of TiE's attributable impact numbers.</p>
       </div>
+
+      <!-- Live impact summary -->
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;">Impact summary — real deals</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-xs btn-xs-outline" onclick="openAddDeal()">+ Add deal</button>
+            <button class="btn-xs" onclick="loadDeals()">Refresh</button>
+          </div>
+        </div>
+        <div id="admin-impact-stats"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+      </div>
+
+      <!-- Add-deal inline form (hidden until +Add deal) -->
+      <div class="admin-card" id="add-deal-card" style="display:none;margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Track a new deal</div>
+        <div class="upload-grid">
+          <div class="form-group"><label>Founder ID</label><input type="number" id="deal-founder-id" placeholder="e.g. 3"></div>
+          <div class="form-group"><label>Startup (if no ID)</label><input type="text" id="deal-startup" placeholder="e.g. Stackr"></div>
+        </div>
+        <div class="upload-grid">
+          <div class="form-group"><label>Investor email</label><input type="email" id="deal-investor-email" placeholder="name@fund.com"></div>
+          <div class="form-group"><label>Investor name</label><input type="text" id="deal-investor-name" placeholder="e.g. Anita Menon"></div>
+        </div>
+        <div id="add-deal-msg" style="display:none;font-size:12px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-xs btn-xs-green" onclick="submitAddDeal(this)">Create deal</button>
+          <button class="btn-xs btn-xs-outline" onclick="document.getElementById('add-deal-card').style.display='none'">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Live deal table -->
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;">All tracked deals</div>
+        <div id="admin-deals-live"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+      </div>
+
       <div class="admin-card">
+        <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample deal flow (illustrative)</div>
         <table class="admin-table">
           <thead><tr><th>Founder</th><th>Startup · Sector</th><th>Stage</th><th>Mark status</th><th>Investor views</th><th>Meeting requests</th><th>Last activity</th></tr></thead>
           <tbody>
@@ -3489,6 +3542,40 @@ function unflagConflict(founder, el){
       <div style="font-size:13px;color:var(--grey);">If you join TiE Bangalore later, the full membership fee of ₹10,000 + GST applies — the ₹3,000 + GST review fee is not a credit toward membership.</div>
       <button class="btn btn-outline btn-lg" onclick="goPay('VentureReady Expert Review','₹3,000 + GST',' one-time','interview')" style="flex-shrink:0;white-space:nowrap;">Proceed with Expert Review — ₹3,000 + GST →</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
+     PUBLIC — TiE IMPACT SHOWCASE (aggregated + anonymised; consent-gated ₹)
+══════════════════════════ -->
+<div id="screen-impact" class="screen">
+  <div class="shell">
+    <div class="upload-hd" style="text-align:center;">
+      <div class="overline">VentureReady by TiE Bangalore</div>
+      <h1>The impact of a VentureReady founder–investor match</h1>
+      <p>Every number here comes from real deals tracked on the platform, from introduction to outcome. Figures are aggregated and anonymised; the capital total counts only investments both parties agreed could be shown.</p>
+    </div>
+
+    <div id="impact-hero" style="text-align:center;margin:24px 0 8px;">
+      <div style="font-size:13px;color:var(--grey);">Loading impact…</div>
+    </div>
+
+    <div id="impact-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:24px 0;"></div>
+
+    <div id="impact-funnel" style="margin:8px 0 24px;"></div>
+
+    <p style="font-size:12px;color:var(--grey);text-align:center;line-height:1.6;max-width:640px;margin:0 auto 32px;">
+      Capital enabled reflects only closed investments where both the founder and the investor consented to inclusion, with a disclosed amount. Deals closed without a shared amount are counted separately and never estimated.
+    </p>
+
+    <div style="text-align:center;">
+      <button class="btn btn-outline" onclick="go('home')">← Back to Home</button>
+    </div>
+  </div>
+  <div class="dark-footer">
+    <div><img class="tie-logo-light" alt="TiE Bangalore" style="height:26px;width:auto;margin-bottom:4px;"><div class="sub">Institutional Platform</div></div>
+    <div><a onclick="go('terms')" style="cursor:pointer;">Terms</a><a onclick="go('privacy')" style="cursor:pointer;">Privacy</a><a onclick="openSupport()" style="cursor:pointer;">Support</a></div>
+    <div class="copy">© 2024 VentureReady by TiE. All rights reserved.</div>
   </div>
 </div>
 
@@ -3891,6 +3978,7 @@ function showAdminPage(page, el){
   if(page==='reviews' && typeof loadReviewQueue==='function') loadReviewQueue();
   if(page==='applications' && typeof loadInvestors==='function') loadInvestors();
   if(page==='meetings' && typeof loadMeetings==='function') loadMeetings();
+  if(page==='dealflow' && typeof loadDeals==='function') loadDeals();
 }
 function handleNdaContinue(){
   const isFree = document.getElementById('memberToggle').value === 'free';
@@ -4629,6 +4717,9 @@ function go(name){
   if(name==='investor-dataroom' && typeof renderInvestorDataRoom==='function') renderInvestorDataRoom();
   if(name==='verdict-notyet' && typeof populateNotYet==='function') populateNotYet();
   if((name==='profile'||name==='verdict') && typeof renderFounderProfile==='function') renderFounderProfile();
+  if(name==='profile' && typeof loadFounderDeals==='function') loadFounderDeals();
+  if(name==='investor-account' && typeof loadInvestorDeals==='function') loadInvestorDeals();
+  if(name==='impact' && typeof loadImpact==='function') loadImpact();
   if(name==='resubmit' && typeof populateResubmit==='function') populateResubmit();
   if((name==='terms'||name==='privacy') && typeof populateLegal==='function') populateLegal(name);
   // Toggle nav auth state: Login/Sign up on home only, My Profile everywhere else
@@ -5336,6 +5427,284 @@ async function markIntroSent(meetingId, btn){
     if(out.error){ alert(out.error); if(btn){ btn.disabled=false; btn.textContent='Mark Intro Sent'; } return; }
     _renderMeetings(out.meetings||[]);
   }catch(e){ alert('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Mark Intro Sent'; } }
+}
+
+// ---- Deal flow & impact (admin view) -------------------------------------
+// Format whole rupees as ₹ lakh / crore, the way Indian founders read amounts.
+function _inr(n){
+  n = Number(n)||0;
+  if(n >= 10000000) return '₹'+(n/10000000).toFixed(n%10000000?2:0).replace(/\.00$/,'')+' Cr';
+  if(n >= 100000)   return '₹'+(n/100000).toFixed(n%100000?2:0).replace(/\.00$/,'')+' L';
+  return '₹'+n.toLocaleString('en-IN');
+}
+var DEAL_STAGE_LABELS = {introduced:'Introduced', met:'Met', diligence:'In diligence',
+  term_sheet:'Term sheet', closed:'Closed', passed:'Passed'};
+var DEAL_STAGE_ORDER = ['introduced','met','diligence','term_sheet','closed','passed'];
+var DEAL_CONF_LABELS = {tie_verified:'TiE-verified', both_confirmed:'Both confirmed',
+  one_confirmed:'One side', unconfirmed:'Unconfirmed'};
+
+async function loadDeals(){
+  var stats=document.getElementById('admin-impact-stats');
+  var live=document.getElementById('admin-deals-live');
+  if(!window.__adminCred){
+    if(stats) stats.innerHTML='<div style="font-size:12px;color:var(--mid);">Sign in with a Google admin account to see real deal flow and impact.</div>';
+    if(live) live.innerHTML='';
+    return;
+  }
+  if(stats) stats.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading…</p>';
+  try{
+    var r=await fetch('/api/admin/deals',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ if(stats) stats.innerHTML='<div style="font-size:12px;color:var(--red);">'+_escapeHtml(out.error)+'</div>'; return; }
+    _renderImpactStats(out.stats||{});
+    _renderDealsTable(out.deals||[]);
+  }catch(e){ if(stats) stats.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+function _statTile(label, value, sub){
+  return '<div style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'+
+    '<div style="font-size:22px;font-weight:800;color:var(--dark);">'+value+'</div>'+
+    '<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--grey);margin-top:2px;">'+_escapeHtml(label)+'</div>'+
+    (sub?'<div style="font-size:11px;color:var(--mid);margin-top:3px;">'+_escapeHtml(sub)+'</div>':'')+'</div>';
+}
+function _renderImpactStats(s){
+  var el=document.getElementById('admin-impact-stats'); if(!el) return;
+  var bs=s.by_stage||{}; var conf=s.confidence||{};
+  var unds=s.undisclosed_closed||0;
+  var html='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'+
+    _statTile('Capital enabled', _inr(s.capital_disclosed_inr||0), (unds?('+ '+unds+' closed, amount undisclosed'):'from disclosed closings'))+
+    _statTile('Deals closed', s.closed||0, (s.total||0)+' tracked in total')+
+    _statTile('Founders', s.founders||0, 'with a tracked deal')+
+    _statTile('Investors', s.investors||0, 'active in deal flow')+
+    '</div>';
+  // Funnel bar
+  html+='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--grey);margin:6px 0 6px;">Funnel</div>';
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
+  DEAL_STAGE_ORDER.forEach(function(st){
+    var n=bs[st]||0;
+    var isPassed=(st==='passed');
+    html+='<div style="flex:1;min-width:90px;text-align:center;background:'+(isPassed?'var(--surface)':'#fff')+';border:1px solid var(--border);border-radius:8px;padding:8px 6px;">'+
+      '<div style="font-size:18px;font-weight:800;color:'+(isPassed?'var(--grey)':'var(--dark)')+';">'+n+'</div>'+
+      '<div style="font-size:10px;color:var(--grey);">'+DEAL_STAGE_LABELS[st]+'</div></div>';
+  });
+  html+='</div>';
+  // Confidence note (credibility of the closed number)
+  html+='<div style="font-size:11px;color:var(--mid);line-height:1.6;">Closed-deal confidence: '+
+    '<strong>'+(conf.tie_verified||0)+'</strong> TiE-verified · '+
+    '<strong>'+(conf.both_confirmed||0)+'</strong> both sides · '+
+    '<strong>'+(conf.one_confirmed||0)+'</strong> one side · '+
+    '<strong>'+(conf.unconfirmed||0)+'</strong> unconfirmed. '+
+    'Only deals both parties consent to feed the public impact page.</div>';
+  el.innerHTML=html;
+}
+function _dealStageSelect(deal){
+  var opts=DEAL_STAGE_ORDER.map(function(st){
+    return '<option value="'+st+'"'+(deal.stage===st?' selected':'')+'>'+DEAL_STAGE_LABELS[st]+'</option>';
+  }).join('');
+  return '<select onchange="adminSetStage('+deal.id+',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:5px;">'+opts+'</select>';
+}
+function _confBadge(c){
+  var color={tie_verified:'var(--green)',both_confirmed:'#2563EB',one_confirmed:'#D97706',unconfirmed:'var(--grey)'}[c]||'var(--grey)';
+  return '<span style="font-size:10px;font-weight:700;color:'+color+';">'+(DEAL_CONF_LABELS[c]||c)+'</span>';
+}
+function _renderDealsTable(deals){
+  var el=document.getElementById('admin-deals-live'); if(!el) return;
+  if(!deals.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--mid);">No real deals tracked yet. Use “+ Add deal” to start tracking a founder–investor relationship, or they appear as introductions happen.</div>';
+    return;
+  }
+  var html='<table class="admin-table"><thead><tr><th>Founder / Startup</th><th>Investor</th><th>Stage</th><th>Amount</th><th>Confidence</th><th>Action</th></tr></thead><tbody>';
+  deals.forEach(function(d){
+    var amt = d.stage==='closed'
+      ? (d.amount_disclosed && d.amount_inr ? _inr(d.amount_inr) : '<span style="color:var(--grey);">undisclosed</span>')
+      : '<span style="color:var(--grey);">—</span>';
+    var consent = (d.founder_consent_public&&d.investor_consent_public)
+      ? '<span style="font-size:10px;color:var(--green);">public-ok</span>'
+      : '<span style="font-size:10px;color:var(--grey);">private</span>';
+    html+='<tr><td><strong>'+_escapeHtml(d.startup||d.founder_name||'—')+'</strong>'+
+        (d.founder_name&&d.startup?'<br><span style="font-size:11px;color:var(--grey);">'+_escapeHtml(d.founder_name)+'</span>':'')+'</td>'+
+      '<td>'+_escapeHtml(d.investor_name||d.investor_email||'—')+
+        (d.firm?'<br><span style="font-size:11px;color:var(--grey);">'+_escapeHtml(d.firm)+'</span>':'')+'</td>'+
+      '<td>'+_dealStageSelect(d)+'</td>'+
+      '<td>'+amt+'<br>'+consent+'</td>'+
+      '<td>'+_confBadge(d.confidence)+'</td>'+
+      '<td class="action-btns"><button class="btn-xs '+(d.tie_verified?'btn-xs-outline':'btn-xs-green')+'" onclick="verifyDeal('+d.id+','+(d.tie_verified?'false':'true')+')">'+(d.tie_verified?'Unverify':'TiE-verify')+'</button></td></tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+async function adminSetStage(dealId, stage){
+  if(!window.__adminCred){ alert('Sign in as admin first.'); return; }
+  try{
+    var r=await fetch('/api/deal/advance',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({deal_id:dealId, actor:'admin', stage:stage})});
+    var out=await r.json();
+    if(out.error){ alert(out.error); }
+    loadDeals();
+  }catch(e){ alert('Could not reach the server. Please try again.'); }
+}
+async function verifyDeal(dealId, verified){
+  if(!window.__adminCred){ alert('Sign in as admin first.'); return; }
+  try{
+    var r=await fetch('/api/deal/verify',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, deal_id:dealId, verified:verified})});
+    var out=await r.json();
+    if(out.error){ alert(out.error); return; }
+    loadDeals();
+  }catch(e){ alert('Could not reach the server. Please try again.'); }
+}
+function openAddDeal(){
+  var c=document.getElementById('add-deal-card'); if(c) c.style.display='';
+  var m=document.getElementById('add-deal-msg'); if(m) m.style.display='none';
+}
+async function submitAddDeal(btn){
+  var m=document.getElementById('add-deal-msg');
+  function show(t,ok){ if(!m) return; m.style.display=''; m.style.color=ok?'var(--green)':'var(--red)'; m.textContent=t; }
+  var body={ founder_id: (document.getElementById('deal-founder-id').value||'').trim()||null,
+    startup: _v('deal-startup'), investor_email:_v('deal-investor-email'), investor_name:_v('deal-investor-name') };
+  if(!body.founder_id && !body.startup){ show('Enter a founder ID or a startup name.'); return; }
+  if(!body.investor_email && !body.investor_name){ show('Enter an investor email or name.'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='Creating…'; }
+  try{
+    var r=await fetch('/api/deal/create',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    var out=await r.json();
+    if(btn){ btn.disabled=false; btn.textContent='Create deal'; }
+    if(out.error){ show(out.error); return; }
+    show(out.reused?'That deal already existed — showing it below.':'Deal created.', true);
+    document.getElementById('deal-founder-id').value=''; document.getElementById('deal-startup').value='';
+    document.getElementById('deal-investor-email').value=''; document.getElementById('deal-investor-name').value='';
+    loadDeals();
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Create deal'; } show('Could not reach the server. Please try again.'); }
+}
+
+// ---- Deals: the two-sided party view (founder + investor) ----------------
+async function loadFounderDeals(){
+  var wrap=document.getElementById('founder-deals-wrap');
+  var el=document.getElementById('founder-deals');
+  if(!wrap||!el||!window._founderId) return;
+  try{
+    var r=await fetch('/api/deals?founder_id='+encodeURIComponent(window._founderId));
+    var out=await r.json();
+    var deals=out.deals||[];
+    if(!deals.length){ wrap.style.display='none'; return; }
+    wrap.style.display='';
+    _renderPartyDeals(deals, 'founder', el);
+  }catch(e){}
+}
+async function loadInvestorDeals(){
+  var wrap=document.getElementById('investor-deals-wrap');
+  var el=document.getElementById('investor-deals');
+  if(!wrap||!el||!window._investorEmail) return;
+  try{
+    var r=await fetch('/api/deals?investor_email='+encodeURIComponent(window._investorEmail));
+    var out=await r.json();
+    var deals=out.deals||[];
+    if(!deals.length){ wrap.style.display='none'; return; }
+    wrap.style.display='';
+    _renderPartyDeals(deals, 'investor', el);
+  }catch(e){}
+}
+function _reloadPartyDeals(party){ party==='founder' ? loadFounderDeals() : loadInvestorDeals(); }
+function _renderPartyDeals(deals, party, el){
+  var html='';
+  deals.forEach(function(d){
+    var counterpart = party==='founder'
+      ? (d.investor_name||d.investor_email||'An investor')
+      : (d.startup||d.founder_name||'A founder');
+    var myConfirmed = party==='founder' ? d.founder_confirmed : d.investor_confirmed;
+    var myConsent   = party==='founder' ? d.founder_consent_public : d.investor_consent_public;
+    var stageOpts = DEAL_STAGE_ORDER.map(function(st){
+      return '<option value="'+st+'"'+(d.stage===st?' selected':'')+'>'+DEAL_STAGE_LABELS[st]+'</option>';
+    }).join('');
+    html+='<div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'+
+        '<div style="font-size:13px;font-weight:700;">'+_escapeHtml(counterpart)+'</div>'+
+        '<div style="font-size:11px;color:'+(myConfirmed?'var(--green)':'#D97706')+';">'+(myConfirmed?'✓ you\'ve confirmed this status':'awaiting your confirmation')+'</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;">'+
+        '<label style="font-size:11px;color:var(--grey);">Status:</label>'+
+        '<select onchange="partySetStage('+d.id+',\''+party+'\',this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;">'+stageOpts+'</select>'+
+        (myConfirmed?'':'<button class="btn-xs btn-xs-outline" onclick="partyConfirm('+d.id+',\''+party+'\')">Confirm current status</button>')+
+      '</div>';
+    if(d.stage==='closed'){
+      html+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">This became an investment</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'+
+          '<label style="font-size:12px;">Amount (₹, optional):</label>'+
+          '<input type="number" id="deal-amt-'+party+'-'+d.id+'" value="'+(d.amount_inr||'')+'" placeholder="whole rupees" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;width:150px;">'+
+        '</div>'+
+        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--dark);line-height:1.5;margin-bottom:10px;cursor:pointer;">'+
+          '<input type="checkbox" id="deal-consent-'+party+'-'+d.id+'"'+(myConsent?' checked':'')+' style="margin-top:2px;">'+
+          '<span>TiE may include this investment in its <strong>anonymised, aggregated</strong> public impact figures. Your name, the other party, and the exact amount stay private unless you both separately agree.</span>'+
+        '</label>'+
+        '<button class="btn-xs btn-xs-green" onclick="partySaveClose('+d.id+',\''+party+'\')">Save &amp; confirm</button>'+
+      '</div>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+async function _partyPost(body, party){
+  try{
+    var r=await fetch('/api/deal/advance',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    var out=await r.json();
+    if(out.error){ alert(out.error); return; }
+    _reloadPartyDeals(party);
+  }catch(e){ alert('Could not reach the server. Please try again.'); }
+}
+function partySetStage(dealId, party, stage){ _partyPost({deal_id:dealId, actor:party, stage:stage}, party); }
+function partyConfirm(dealId, party){ _partyPost({deal_id:dealId, actor:party}, party); }
+function partySaveClose(dealId, party){
+  var amtEl=document.getElementById('deal-amt-'+party+'-'+dealId);
+  var conEl=document.getElementById('deal-consent-'+party+'-'+dealId);
+  var body={deal_id:dealId, actor:party, stage:'closed', consent_public: conEl?conEl.checked:false};
+  var amt=amtEl?(amtEl.value||'').trim():'';
+  if(amt!==''){ body.amount_inr = amt; }
+  _partyPost(body, party);
+}
+
+// ---- Public impact showcase (aggregated, anonymised, consent-gated) -------
+async function loadImpact(){
+  var hero=document.getElementById('impact-hero');
+  var grid=document.getElementById('impact-grid');
+  var funnel=document.getElementById('impact-funnel');
+  try{
+    var r=await fetch('/api/impact');
+    var s=await r.json();
+    if(hero){
+      var undis = s.closings_amount_undisclosed||0;
+      hero.innerHTML='<div style="font-size:44px;font-weight:900;color:var(--red);letter-spacing:-1px;">'+_inr(s.capital_enabled_inr||0)+'</div>'+
+        '<div style="font-size:14px;color:var(--dark);font-weight:600;">capital enabled into TiE founders</div>'+
+        (undis?('<div style="font-size:12px;color:var(--grey);margin-top:4px;">plus '+undis+' more closed investment'+(undis===1?'':'s')+' with amounts kept private</div>'):'');
+    }
+    if(grid){
+      grid.innerHTML=
+        _impactTile(s.closed||0, 'investments closed')+
+        _impactTile(s.startups_backed||0, 'startups backed')+
+        _impactTile(s.investors_active||0, 'active investors')+
+        _impactTile(s.introductions||0, 'introductions made');
+    }
+    if(funnel){
+      var steps=[['Introduced',s.introductions||0],['Met',s.meetings||0],['Diligence+',s.in_diligence_plus||0],['Closed',s.closed||0]];
+      var max=Math.max(1, s.introductions||0);
+      var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--grey);margin-bottom:10px;text-align:center;">From introduction to investment</div>';
+      steps.forEach(function(st){
+        var pct=Math.round((st[1]/max)*100);
+        html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'+
+          '<div style="width:90px;font-size:12px;color:var(--dark);text-align:right;">'+st[0]+'</div>'+
+          '<div style="flex:1;background:var(--surface);border-radius:6px;overflow:hidden;height:22px;"><div style="width:'+Math.max(pct,3)+'%;height:100%;background:var(--red);"></div></div>'+
+          '<div style="width:40px;font-size:13px;font-weight:700;color:var(--dark);">'+st[1]+'</div></div>';
+      });
+      funnel.innerHTML=html;
+    }
+  }catch(e){ if(hero) hero.innerHTML='<div style="font-size:13px;color:var(--red);">Could not load impact figures right now.</div>'; }
+}
+function _impactTile(value, label){
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center;">'+
+    '<div style="font-size:30px;font-weight:800;color:var(--dark);">'+value+'</div>'+
+    '<div style="font-size:12px;color:var(--grey);margin-top:3px;">'+_escapeHtml(label)+'</div></div>';
 }
 
 // Founder demo fallback used only when NO Google Client ID is configured.
