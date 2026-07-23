@@ -43,6 +43,7 @@ git-ignored and must never be committed.
 | `ANTHROPIC_API_KEY` | Live AI positioning diagnostic (Claude) | Falls back to a canned sample result |
 | `ANTHROPIC_MODEL` | Optional — pin a specific Claude model | Uses the default model |
 | `TIE_MEMBERSHIP_URL` | TiE Bangalore's membership page. Membership is **not** paid for in this app — the "Join TiE Bangalore" buttons hand off to this URL, and the app then re-checks membership against Zoho. Founders pick "Associate Membership" (₹10,000 + GST/yr) there. | Join buttons are hidden; founders are told to email admin.blr@tiebangalore.org |
+| `EXPERT_REVIEW_PAYMENT_URL` | Razorpay payment link for the one-time expert review (₹3,000 + GST). Payment happens **on Razorpay** — the button hands off to this link and records the intent so admins can reconcile it in the Razorpay dashboard. | Falls back to the in-app demo checkout |
 | `ADMIN_EMAILS` | First-run **seed** of extra admin emails for the Team Portal (comma-separated). After first run the list is managed in-app by a super-admin. | Only the super-admins can sign in |
 | `ADMIN_SUPER_EMAILS` | Super-admins (comma-separated) who can add/remove admins in-app and can't be removed | Defaults to `admin.blr@tiebangalore.org,chinmay@tiebangalore.org` |
 

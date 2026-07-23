@@ -3666,7 +3666,7 @@ function unflagConflict(founder, el){
     <!-- Confirm expert review -->
     <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:4px;">
       <div style="font-size:13px;color:var(--grey);">If you join TiE Bangalore later, the full membership fee of ₹10,000 + GST applies — the ₹3,000 + GST review fee is not a credit toward membership.</div>
-      <button class="btn btn-outline btn-lg" onclick="goPay('VentureReady Expert Review','₹3,000 + GST',' one-time','interview')" style="flex-shrink:0;white-space:nowrap;">Proceed with Expert Review — ₹3,000 + GST →</button>
+      <button class="btn btn-outline btn-lg" onclick="goExpertReviewPay()" style="flex-shrink:0;white-space:nowrap;">Proceed with Expert Review — ₹3,000 + GST →</button>
     </div>
   </div>
 </div>
@@ -3702,6 +3702,42 @@ function unflagConflict(founder, el){
     <div><img class="tie-logo-light" alt="TiE Bangalore" style="height:26px;width:auto;margin-bottom:4px;"><div class="sub">Institutional Platform</div></div>
     <div><a onclick="go('terms')" style="cursor:pointer;">Terms</a><a onclick="go('privacy')" style="cursor:pointer;">Privacy</a><a onclick="openSupport()" style="cursor:pointer;">Support</a></div>
     <div class="copy">© 2024 VentureReady by TiE. All rights reserved.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
+     EXPERT REVIEW PAYMENT (hand-off to Razorpay; money is taken there, not here)
+══════════════════════════ -->
+<div id="screen-expert-review-pay" class="screen">
+  <div class="login-bg">
+    <div class="login-card center-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <img class="tie-logo-dark" alt="TiE Bangalore" style="height:32px;width:auto;">
+        <div class="nav-sep"></div>
+        <span style="font-size:15px;font-weight:900;letter-spacing:-0.3px;color:var(--dark);">Venture<span style="color:var(--red);">Ready</span></span>
+      </div>
+      <div style="font-size:12px;color:var(--mid);margin-bottom:20px;">Secure payment via Razorpay</div>
+
+      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;">Pay for your expert review</h1>
+      <p class="sub" style="margin-bottom:20px;">A one-time <strong>₹3,000 + GST</strong> for a TiE Charter Member to review your deck against the bar. Payment is handled securely by Razorpay.</p>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:6px;">What happens next</div>
+        <div style="font-size:13px;color:var(--dark);line-height:1.7;">
+          1. The Razorpay payment page opens in a new tab — VentureReady stays open here.<br>
+          2. Complete the ₹3,000 + GST payment there.<br>
+          3. Come back to this tab and continue to your questionnaire.
+        </div>
+      </div>
+
+      <div id="erp-link-missing" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--dark);line-height:1.6;">
+        The payment link hasn't been set up yet. Please email <strong>admin.blr@tiebangalore.org</strong> and the team will send you the payment link directly.
+      </div>
+
+      <button class="btn btn-red btn-full btn-lg" id="erp-open-btn" onclick="openExpertReviewPayment(this)">Pay ₹3,000 + GST via Razorpay →</button>
+      <button class="btn btn-outline btn-full" style="margin-top:10px" onclick="go('interview')">I've paid — continue to the questionnaire →</button>
+      <div style="font-size:11px;color:var(--mid);margin-top:12px;line-height:1.5;">TiE confirms your payment in Razorpay before your review is actioned.</div>
+    </div>
   </div>
 </div>
 
@@ -3905,6 +3941,26 @@ function openMembershipPage(btn){
         name:window._founderName||'', tier:'Associate Membership'})}).catch(function(){});
   }catch(e){}
   window.open(window._membershipUrl, '_blank', 'noopener');
+}
+
+// ── EXPERT REVIEW PAYMENT (hand-off to Razorpay; money is taken there) ──────
+function goExpertReviewPay(){
+  var btn=document.getElementById('erp-open-btn');
+  var warn=document.getElementById('erp-link-missing');
+  var has=!!(window._expertReviewUrl);
+  if(btn) btn.style.display = has ? '' : 'none';
+  if(warn) warn.style.display = has ? 'none' : '';
+  go('expert-review-pay');
+}
+function openExpertReviewPayment(btn){
+  if(!window._expertReviewUrl){ var w=document.getElementById('erp-link-missing'); if(w) w.style.display=''; return; }
+  // Record that the founder went to pay, so admins can reconcile it in Razorpay.
+  try{
+    fetch('/api/expert-review/handoff',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_id:window._founderId||null, email:window._founderEmail||'',
+        name:window._founderName||''})}).catch(function(){});
+  }catch(e){}
+  window.open(window._expertReviewUrl, '_blank', 'noopener');
 }
 async function recheckMembership(btn){
   var msg=document.getElementById('membership-recheck-msg');
@@ -5118,6 +5174,7 @@ async function initGoogleSignIn(){
     var cfg=await r.json();
     clientId=cfg.googleClientId||'';
     window._membershipUrl=cfg.membershipUrl||'';
+    window._expertReviewUrl=cfg.expertReviewUrl||'';
     _reflectMembershipLink();
   }catch(e){}
   if(!clientId) return;                 // not configured → keep the demo fallback button

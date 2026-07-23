@@ -679,6 +679,12 @@ const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID || "";
 // the front-end hides the join buttons rather than showing a broken link.
 const TIE_MEMBERSHIP_URL = (ENV.TIE_MEMBERSHIP_URL || "").trim();
 
+// Razorpay payment link for the one-time expert review (₹3,000 + GST). Payment
+// happens on Razorpay, not in this app — we hand off and record the intent so
+// admins can reconcile it. Set EXPERT_REVIEW_PAYMENT_URL in .env; if blank the
+// button falls back to the in-app demo checkout.
+const EXPERT_REVIEW_PAYMENT_URL = (ENV.EXPERT_REVIEW_PAYMENT_URL || "").trim();
+
 // ---- Admin / Team-Portal access allow-list ----
 // Only these Google-verified emails may enter the admin portal. Access is an
 // explicit allow-list (NOT the whole @tiebangalore.org domain).
@@ -1172,6 +1178,22 @@ function membership_handoff(d) {
     (name || email) + " opened the TiE Bangalore membership form to join as " + tier +
     ". They're recognised as a member as soon as they finish; the app re-checks when they " +
     "come back, so follow up if it never appears.", "normal");
+  return { ok: true, recorded: true };
+}
+
+function expert_review_handoff(d) {
+  // Records that a founder went to pay the one-time expert review fee on
+  // Razorpay. NOT a payment record — admins confirm it in Razorpay.
+  const founder_id = d.founder_id;
+  const fb = founder_id ? _founder_brief(founder_id) : {};
+  const email = (d.email || fb.email || "").trim().toLowerCase();
+  const name = (d.name || fb.name || "").trim();
+  if (!email && !name) return { ok: true, recorded: false };
+  notify("expert_review_payment", ["admins"],
+    "Founder went to pay for expert review: " + (name || email),
+    (name || email) + " opened the Razorpay link to pay the ₹3,000 + GST one-time expert " +
+    "review fee. Confirm the payment in the Razorpay dashboard before their review is actioned.",
+    "normal");
   return { ok: true, recorded: true };
 }
 
@@ -1960,7 +1982,7 @@ async function handleGet(req, res, urlObj) {
     // Public front-end config. Only non-secret values belong here. The Google
     // Client ID is designed to be public; the browser needs it to show the button.
     return sendJson(res, 200, { googleClientId: GOOGLE_CLIENT_ID,
-      membershipUrl: TIE_MEMBERSHIP_URL });
+      membershipUrl: TIE_MEMBERSHIP_URL, expertReviewUrl: EXPERT_REVIEW_PAYMENT_URL });
   }
   if (p === "/api/support") return sendJson(res, 200, support_list());
   if (p === "/api/review") {
@@ -2230,6 +2252,8 @@ async function handlePost(req, res, urlObj, data) {
     return sendJson(res, 200, out);
   } else if (p === "/api/membership/handoff") {
     return sendJson(res, 200, membership_handoff(data));
+  } else if (p === "/api/expert-review/handoff") {
+    return sendJson(res, 200, expert_review_handoff(data));
   } else if (p === "/api/membership/recheck") {
     const out = await membership_recheck(data);
     return sendJson(res, out.error ? (out.status || 400) : 200, out);

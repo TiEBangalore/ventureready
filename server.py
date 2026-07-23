@@ -698,6 +698,13 @@ GOOGLE_CLIENT_ID = ENV.get("GOOGLE_CLIENT_ID", "")
 # the front-end hides the join buttons rather than showing a broken link.
 TIE_MEMBERSHIP_URL = ENV.get("TIE_MEMBERSHIP_URL", "").strip()
 
+# Razorpay payment link for the one-time expert review (₹3,000 + GST). Payment
+# happens on Razorpay, not in this app — we hand off to the link and record that
+# the founder went to pay so admins can reconcile it in the Razorpay dashboard.
+# Set EXPERT_REVIEW_PAYMENT_URL in .env; if blank the button falls back to the
+# in-app demo checkout.
+EXPERT_REVIEW_PAYMENT_URL = ENV.get("EXPERT_REVIEW_PAYMENT_URL", "").strip()
+
 # ---- Admin / Team-Portal access allow-list ----
 # Only these Google-verified emails may enter the admin portal. Access is an
 # explicit allow-list (NOT the whole @tiebangalore.org domain).
@@ -1257,6 +1264,23 @@ def membership_handoff(d):
            (name or email) + " opened the TiE Bangalore membership form to join as " + tier +
            ". They're recognised as a member as soon as they finish; the app re-checks when they "
            "come back, so follow up if it never appears.", "normal")
+    return {"ok": True, "recorded": True}
+
+def expert_review_handoff(d):
+    # Records that a founder went to pay the one-time expert review fee on
+    # Razorpay. NOT a payment record — the app never sees the money; admins
+    # confirm it in the Razorpay dashboard using this heads-up.
+    founder_id = d.get("founder_id")
+    fb = _founder_brief(founder_id) if founder_id else {}
+    email = (d.get("email") or fb.get("email") or "").strip().lower()
+    name = (d.get("name") or fb.get("name") or "").strip()
+    if not (email or name):
+        return {"ok": True, "recorded": False}
+    notify("expert_review_payment", ["admins"],
+           "Founder went to pay for expert review: " + (name or email),
+           (name or email) + " opened the Razorpay link to pay the ₹3,000 + GST one-time expert "
+           "review fee. Confirm the payment in the Razorpay dashboard before their review is "
+           "actioned.", "normal")
     return {"ok": True, "recorded": True}
 
 def membership_recheck(d):
@@ -2060,7 +2084,8 @@ class Handler(BaseHTTPRequestHandler):
             # Public front-end config. Only non-secret values belong here. The
             # Google Client ID is designed to be public (the browser needs it).
             return self._send(200, {"googleClientId": GOOGLE_CLIENT_ID,
-                                    "membershipUrl": TIE_MEMBERSHIP_URL})
+                                    "membershipUrl": TIE_MEMBERSHIP_URL,
+                                    "expertReviewUrl": EXPERT_REVIEW_PAYMENT_URL})
         if path == "/api/support":
             return self._send(200, support_list())
         if path == "/api/review":
@@ -2343,6 +2368,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, out)
             elif self.path == "/api/membership/handoff":
                 self._send(200, membership_handoff(data))
+            elif self.path == "/api/expert-review/handoff":
+                self._send(200, expert_review_handoff(data))
             elif self.path == "/api/membership/recheck":
                 out = membership_recheck(data)
                 self._send(out.get("status", 400) if out.get("error") else 200, out)
