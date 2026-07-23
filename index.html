@@ -1702,6 +1702,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 </div>
 
 <!-- ══════════════════════════
+     INVESTOR SIGN-IN (returning applicant)
+══════════════════════════ -->
+<div id="screen-investor-login" class="screen">
+  <div class="login-bg">
+    <div class="login-card center-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;justify-content:center;">
+        <img class="tie-logo-dark" alt="TiE Bangalore" style="height:30px;width:auto;">
+      </div>
+      <div class="overline" style="text-align:center;">Screened Investor</div>
+      <h1 style="font-size:22px;font-weight:800;margin:6px 0 4px;text-align:center;">Investor sign-in</h1>
+      <p class="sub" style="text-align:center;margin-bottom:20px;">Sign in to check your application status and, once approved, reach deal flow.</p>
+      <div class="form-group"><label>Email</label><input type="email" id="ilg-email" placeholder="you@fund.com"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="ilg-password" placeholder="Your password"></div>
+      <div id="ilg-error" style="display:none;font-size:13px;color:var(--red);margin-bottom:12px;"></div>
+      <button class="btn btn-red btn-full btn-lg" onclick="investorLogin()">Sign In →</button>
+      <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--mid);">
+        Not applied yet? <a onclick="go('investor-apply')" style="color:var(--red);cursor:pointer;font-weight:600;">Apply for screened access</a>
+      </div>
+      <div style="text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <a onclick="go('home')" style="font-size:12px;color:var(--mid);cursor:pointer;">← Back to home</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
      INVESTOR SCREEN A — APPLY
 ══════════════════════════ -->
 <div id="screen-investor-apply" class="screen">
@@ -1754,6 +1780,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div class="form-group">
       <label>Recent investments <span style="font-weight:400;text-transform:none;letter-spacing:0">— at least 3: company name, sector, stage, and year</span></label>
       <textarea rows="5" id="inv-recent" placeholder="e.g. Stackr — B2B SaaS, Seed, 2024&#10;Ferra Health — Healthtech, Pre-seed, 2023&#10;Loopwise — Fintech, Series A, 2022"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Set a password <span style="font-weight:400;text-transform:none;letter-spacing:0">— so you can sign back in to check your status and, once approved, reach deal flow</span></label>
+      <input type="password" id="inv-password" placeholder="Choose a password" />
     </div>
     <div id="inv-apply-msg" style="display:none;font-size:13px;margin-bottom:12px;"></div>
 
@@ -1825,8 +1855,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
       <div class="form-group">
         <label>Type your full legal name to sign</label>
-        <input type="text" placeholder="Full name" />
+        <input type="text" id="nda-legal-name" placeholder="Full name" />
       </div>
+      <div id="nda-error" style="display:none;font-size:13px;color:var(--red);margin-bottom:10px;"></div>
       <button class="btn btn-red btn-full btn-lg" onclick="handleNdaContinue()">Sign &amp; Continue →</button>
     </div>
   </div>
@@ -1904,8 +1935,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
     </div>
 
+    <div id="dealflow-live" style="margin-bottom:16px;"><p style="font-size:12px;color:var(--grey);">Loading deal flow…</p></div>
+
     <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:8px;padding:10px 14px;font-size:12px;color:#475569;line-height:1.5;margin-bottom:16px;">
-      <strong style="color:#334155;">Sample deal flow.</strong> The founders below are illustrative examples so you can explore the screening experience. Real VentureReady-marked founders appear here once they complete expert review.
+      <strong style="color:#334155;">Sample deal flow (illustrative).</strong> The founders below let you explore the screening experience. Your real VentureReady-marked deal flow appears in the panel above once you're approved and your NDA is signed.
     </div>
 
     <div class="deal-grid">
@@ -2601,10 +2634,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
   <div class="profile-header">
     <div class="profile-header-inner">
-      <div class="profile-avatar-lg" style="background:#1D4ED8;">NB</div>
+      <div class="profile-avatar-lg" id="ivp-avatar" style="background:#1D4ED8;">NB</div>
       <div style="flex:1;">
-        <div class="profile-name">Narendra Bhandari</div>
-        <div class="profile-sub">narendra@seafund.vc · General Partner, Seafund</div>
+        <div class="profile-name" id="ivp-name">Narendra Bhandari</div>
+        <div class="profile-sub" id="ivp-sub">narendra@seafund.vc · General Partner, Seafund</div>
         <div class="profile-badges">
           <div class="inv-tier tier-champion">TiE Champion</div>
           <div style="font-size:10px;color:rgba(255,255,255,.4);">NDA signed · 12 Mar 2026</div>
@@ -3958,9 +3991,9 @@ function selectRole(role){
   }
 }
 function loginRoute(){
-  loggedInAs = loginRole === 'investor' ? 'investor' : 'founder';
-  if(loginRole === 'investor') go('investor-dealflow');
-  else go('upload');
+  // Investors have their own real sign-in (status-gated); founders use the form.
+  if(loginRole === 'investor'){ go('investor-login'); return; }
+  loggedInAs='founder'; go('upload');
 }
 // BARS anchors per dimension per tier (Tier 1 = best … Tier 4 = weakest)
 var TIER_DESC = {
@@ -4066,7 +4099,24 @@ function showAdminPage(page, el){
   if(page==='dealflow' && typeof loadDeals==='function') loadDeals();
   if(page==='verdicts' && typeof loadPendingVerdicts==='function') loadPendingVerdicts();
 }
-function handleNdaContinue(){
+async function handleNdaContinue(){
+  var err=document.getElementById('nda-error');
+  function show(t){ if(err){ err.style.display=''; err.textContent=t; } }
+  if(err) err.style.display='none';
+  var checked=(document.getElementById('ndaCheck')||{}).checked;
+  var legal=((document.getElementById('nda-legal-name')||{}).value||'').trim();
+  if(!checked){ show('Please tick the box to agree to the NDA.'); return; }
+  if(!legal){ show('Please type your full legal name to sign.'); return; }
+  // Record the signature against the investor's real account.
+  if(window._investorEmail){
+    try{
+      var r=await fetch('/api/investor/nda',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:window._investorEmail, legal_name:legal})});
+      var out=await r.json();
+      if(out.error){ show(out.error); return; }
+      window._investorNdaSigned=true;
+    }catch(e){ show('Could not reach the server. Please try again.'); return; }
+  }
   const isFree = document.getElementById('memberToggle').value === 'free';
   if(isFree){ go('investor-invite'); }
   else { goPay('Investor Deal-Flow Access', '₹35,000', ' /year', 'investor-invite'); }
@@ -4814,6 +4864,7 @@ function go(name){
   if((name==='profile'||name==='verdict') && typeof renderFounderProfile==='function') renderFounderProfile();
   if(name==='profile' && typeof loadFounderDeals==='function') loadFounderDeals();
   if(name==='investor-account' && typeof loadInvestorDeals==='function') loadInvestorDeals();
+  if(name==='investor-dealflow' && typeof loadDealflow==='function') loadDealflow();
   if(name==='impact' && typeof loadImpact==='function') loadImpact();
   if(name==='reviewer-dashboard' && typeof loadReviewerQueue==='function') loadReviewerQueue();
   if(name==='resubmit' && typeof populateResubmit==='function') populateResubmit();
@@ -5351,22 +5402,109 @@ async function submitInvestorApplication(btn){
   function show(t, ok){ if(!msg) return; msg.style.display=''; msg.style.color= ok?'var(--green)':'var(--red)'; msg.textContent=t; }
   var body={ name:_v('inv-name'), email:_v('inv-email'), firm:_v('inv-firm'),
     tie_status:_v('inv-tie'), cheque_size:_v('inv-cheque'), focus:_v('inv-focus'),
-    track_record:_v('inv-track'), recent_investments:_v('inv-recent') };
+    track_record:_v('inv-track'), recent_investments:_v('inv-recent'), password:_v('inv-password') };
   if(!body.name){ show('Please enter your full name.'); return; }
   if(!body.email){ show('Please enter your email address.'); return; }
+  if(!body.password){ show('Please set a password so you can sign back in.'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Submitting…'; }
   try{
     var r=await fetch('/api/investor/apply',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body)});
     var out=await r.json();
     if(out.error){ show(out.error); if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; } return; }
-    window._investorId=out.investor.id; window._investorEmail=out.investor.email;
-    window._investorName=out.investor.name; window._investorFirm=out.investor.firm;
+    if(typeof _applyInvestor==='function') _applyInvestor(out.investor);
     if(msg) msg.style.display='none';
     if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; }
     loggedInAs='investor'; go('investor-pending');
     startOnboarding('investor');   // first-run walkthrough
   }catch(e){ show('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; } }
+}
+
+// ---- Investor sign-in + status routing -----------------------------------
+function _applyInvestor(inv){
+  var email=inv.email||'', name=(inv.name||'').trim()||email, firm=inv.firm||'';
+  window._investorId=inv.id; window._investorEmail=email;
+  window._investorName=name; window._investorFirm=firm;
+  window._investorNdaSigned=!!inv.nda_signed;
+  var ini=(typeof _initials==='function')?_initials(name):(name.slice(0,2).toUpperCase());
+  var av=document.getElementById('ivp-avatar'); if(av) av.textContent=ini;
+  var nm=document.getElementById('ivp-name'); if(nm) nm.textContent=name;
+  var sb=document.getElementById('ivp-sub'); if(sb) sb.textContent=(email||'')+(firm?(' · '+firm):'');
+  try{
+    PROFILES.investor.name=name; PROFILES.investor.initials=ini;
+    PROFILES.investor.rows=[['Email',email],['Firm',firm||'—'],
+      ['NDA', inv.nda_signed?('Signed'+(inv.nda_signed_at?(' · '+String(inv.nda_signed_at).split(' ')[0]):'')):'Not signed'],
+      ['Status', inv.status||'pending']];
+    if(typeof renderProfileMenu==='function') renderProfileMenu('investor');
+  }catch(e){}
+}
+function _investorRoute(inv){
+  _applyInvestor(inv);
+  loggedInAs='investor';
+  if(inv.status==='rejected'){ go('investor-pending'); return; }  // pending screen also covers declined messaging
+  if(inv.status!=='approved'){ go('investor-pending'); return; }
+  if(!inv.nda_signed){ go('investor-nda'); return; }
+  go('investor-dealflow');
+}
+async function investorLogin(){
+  function v(id){ var el=document.getElementById(id); return el?(el.value||'').trim():''; }
+  var email=v('ilg-email'), pw=v('ilg-password');
+  var err=document.getElementById('ilg-error');
+  function show(t){ if(err){ err.style.display=''; err.textContent=t; } }
+  if(err) err.style.display='none';
+  if(!email||!pw){ show('Please enter your email and password.'); return; }
+  try{
+    var r=await fetch('/api/investor/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,password:pw})});
+    var out=await r.json();
+    if(out.error){ show(out.error); return; }
+    _investorRoute(out.investor);
+  }catch(e){ show('Could not reach the server. Please try again.'); }
+}
+// ---- Real screened deal flow (gated on approved + NDA) --------------------
+async function loadDealflow(){
+  var el=document.getElementById('dealflow-live'); if(!el) return;
+  if(!window._investorEmail){
+    el.innerHTML=_dealflowLocked('Sign in as an approved investor to see your real, screened deal flow.','investor-login','Investor sign-in →');
+    return;
+  }
+  el.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading deal flow…</p>';
+  try{
+    var r=await fetch('/api/dealflow?investor_email='+encodeURIComponent(window._investorEmail));
+    var out=await r.json();
+    if(out.locked){
+      if(out.reason==='not_approved') el.innerHTML=_dealflowLocked('Your application is '+_escapeHtml(out.status||'pending')+'. Once TiE approves you and you sign the NDA, your real deal flow appears here.');
+      else if(out.reason==='nda') el.innerHTML=_dealflowLocked('You\'re approved. Sign your NDA to unlock deal flow.','investor-nda','Sign the NDA →');
+      else el.innerHTML=_dealflowLocked('Sign in as an approved investor to see your real deal flow.','investor-login','Investor sign-in →');
+      return;
+    }
+    _renderDealflow(out.founders||[]);
+  }catch(e){ el.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+function _dealflowLocked(msg, screen, cta){
+  return '<div style="border:1px solid var(--border);border-radius:10px;padding:20px 22px;background:#fff;">'+
+    '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">Your screened deal flow</div>'+
+    '<div style="font-size:13px;color:var(--grey);line-height:1.6;">'+_escapeHtml(msg)+'</div>'+
+    (screen?('<button class="btn btn-red" style="margin-top:12px;" onclick="go(\''+screen+'\')">'+_escapeHtml(cta||'Continue')+'</button>'):'')+'</div>';
+}
+function _renderDealflow(founders){
+  var el=document.getElementById('dealflow-live'); if(!el) return;
+  if(!founders.length){
+    el.innerHTML='<div style="border:1px solid var(--border);border-radius:10px;padding:20px 22px;background:#fff;font-size:13px;color:var(--grey);"><strong style="color:var(--dark);">Your screened deal flow</strong><br>No VentureReady-marked founders yet. As founders earn the mark, they appear here for you first.</div>';
+    return;
+  }
+  var head='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><div style="font-size:13px;font-weight:700;">Your screened deal flow — '+founders.length+' marked founder'+(founders.length===1?'':'s')+'</div><button class="btn-xs" onclick="loadDealflow()">Refresh</button></div>';
+  var grid='<div class="deal-grid">'+founders.map(function(f){
+    return '<div class="deal-card" onclick="openFounderProfile(this)">'+
+      '<div class="deal-card-hd"><div>'+
+        '<div class="deal-co">'+_escapeHtml(f.company||f.name||'Founder')+'</div>'+
+        '<div class="deal-meta">'+_escapeHtml((f.sector||'')+' · '+(f.stage||''))+'</div>'+
+        '<div style="font-size:11px;color:var(--grey);margin-top:2px;">'+_escapeHtml(f.name||'')+' · Founder</div>'+
+      '</div></div>'+
+      '<div class="deal-coach"><span class="dot">●</span>Earned the VentureReady mark'+(f.reviewer?(' · reviewed by '+_escapeHtml(f.reviewer)):'')+'.</div>'+
+    '</div>';
+  }).join('')+'</div>';
+  el.innerHTML=head+grid;
 }
 
 // ---- Live investor applications (admin approve / reject) ------------------

@@ -137,6 +137,12 @@ def db_init():
         conn.execute("ALTER TABLE review ADD COLUMN countersigned_by TEXT")
     if "countersigned_at" not in _rcols:
         conn.execute("ALTER TABLE review ADD COLUMN countersigned_at TEXT")
+    # Investors gain a real account (password/Google) and an NDA record, so an
+    # approved investor can sign back in and only reach deal flow after signing.
+    _icols = [r["name"] for r in conn.execute("PRAGMA table_info(investor)").fetchall()]
+    for _c in ("password_hash", "password_salt", "google_sub", "nda_signed_at", "nda_name"):
+        if _c not in _icols:
+            conn.execute("ALTER TABLE investor ADD COLUMN %s TEXT" % _c)
     # Deals: one founder<->investor relationship tracked from introduction to
     # outcome. This is the substrate for TiE's impact reporting. stage walks:
     # 'introduced' -> 'met' -> 'diligence' -> 'term_sheet' -> 'closed' | 'passed'.
@@ -987,6 +993,9 @@ def _investor_row(r):
             "status": r["status"] or "pending",
             "parent_investor_id": r["parent_investor_id"],
             "decided_by": r["decided_by"] or "", "decided_at": r["decided_at"] or "",
+            "nda_signed_at": (r["nda_signed_at"] if "nda_signed_at" in r.keys() else "") or "",
+            "nda_name": (r["nda_name"] if "nda_name" in r.keys() else "") or "",
+            "nda_signed": bool(("nda_signed_at" in r.keys()) and r["nda_signed_at"]),
             "created_at": r["created_at"] or ""}
 
 def investor_apply(d):
@@ -1010,19 +1019,32 @@ def investor_apply(d):
         conn.close()
         return {"error": "That email already has approved investor access. Please sign in instead.",
                 "status": 400}
+    # A password lets an approved investor sign back in later. Optional so older
+    # flows still work, but the form now collects it.
+    password = d.get("password") or ""
+    pw_hash, pw_salt = _hash_pw(password) if password else (None, None)
     if existing:
-        conn.execute("UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, "
-                     "track_record=?, recent_investments=?, status='pending' WHERE id=?",
-                     (name, fields["firm"], fields["tie_status"], fields["cheque_size"],
-                      fields["focus"], fields["track_record"], fields["recent_investments"],
-                      existing["id"]))
+        if password:
+            conn.execute("UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, "
+                         "track_record=?, recent_investments=?, status='pending', "
+                         "password_hash=?, password_salt=? WHERE id=?",
+                         (name, fields["firm"], fields["tie_status"], fields["cheque_size"],
+                          fields["focus"], fields["track_record"], fields["recent_investments"],
+                          pw_hash, pw_salt, existing["id"]))
+        else:
+            conn.execute("UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, "
+                         "track_record=?, recent_investments=?, status='pending' WHERE id=?",
+                         (name, fields["firm"], fields["tie_status"], fields["cheque_size"],
+                          fields["focus"], fields["track_record"], fields["recent_investments"],
+                          existing["id"]))
         iid = existing["id"]
     else:
         cur = conn.execute(
             "INSERT INTO investor(name, email, firm, tie_status, cheque_size, focus, track_record, "
-            "recent_investments, status, created_at) VALUES(?,?,?,?,?,?,?,?, 'pending', datetime('now'))",
+            "recent_investments, status, password_hash, password_salt, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?, 'pending', ?, ?, datetime('now'))",
             (name, email, fields["firm"], fields["tie_status"], fields["cheque_size"],
-             fields["focus"], fields["track_record"], fields["recent_investments"]))
+             fields["focus"], fields["track_record"], fields["recent_investments"], pw_hash, pw_salt))
         iid = cur.lastrowid
     conn.commit()
     row = conn.execute("SELECT * FROM investor WHERE id=?", (iid,)).fetchone()
@@ -1076,6 +1098,80 @@ def investor_decision(id_token, investor_id, decision, reason=""):
            "Investor " + decision + ": " + who,
            g["email"] + " " + decision + " " + who + " (" + row["email"] + ").", "normal")
     return {"ok": True, "investors": investor_list(id_token).get("investors", [])}
+
+def investor_login(email, password):
+    # Verify an investor's own credentials. Returns the public record (with
+    # status + NDA state) so the front-end can route them correctly.
+    email = (email or "").strip().lower()
+    conn = _db()
+    row = conn.execute("SELECT * FROM investor WHERE email=?", (email,)).fetchone()
+    conn.close()
+    if not row:
+        return {"error": "No investor application found for that email. Please apply first."}
+    if not row["password_hash"] or not row["password_salt"]:
+        return {"error": "This investor account has no password set. Please re-apply to set one."}
+    calc, _ = _hash_pw(password, row["password_salt"])
+    if not hmac.compare_digest(calc, row["password_hash"]):
+        return {"error": "Incorrect email or password."}
+    return {"investor": _investor_row(row)}
+
+def investor_sign_nda(email, legal_name):
+    # Record that this investor signed the NDA. Only meaningful once approved;
+    # deck / deal-flow access is gated on this being present.
+    email = (email or "").strip().lower()
+    legal_name = (legal_name or "").strip()
+    if not legal_name:
+        return {"error": "Please type your full legal name to sign.", "status": 400}
+    conn = _db()
+    row = conn.execute("SELECT * FROM investor WHERE email=?", (email,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "We couldn't find your investor record.", "status": 404}
+    if (row["status"] or "") != "approved":
+        conn.close()
+        return {"error": "Your access isn't approved yet, so the NDA can't be countersigned.",
+                "status": 403}
+    conn.execute("UPDATE investor SET nda_signed_at=datetime('now'), nda_name=? WHERE id=?",
+                 (legal_name, row["id"]))
+    conn.commit()
+    fresh = conn.execute("SELECT * FROM investor WHERE id=?", (row["id"],)).fetchone()
+    conn.close()
+    notify("investor_nda_signed_admin", ["admins"],
+           "Investor NDA signed: " + (row["name"] or email),
+           (legal_name or row["name"] or email) + " signed the VentureReady NDA and now has "
+           "deal-flow access.", "normal")
+    return {"investor": _investor_row(fresh)}
+
+def _marked_founders():
+    # Founders whose latest review is an ISSUED award — i.e. the mark is live.
+    conn = _db()
+    rows = conn.execute("SELECT id, name, company, stage, sector FROM founder ORDER BY id").fetchall()
+    out = []
+    for f in rows:
+        rv = conn.execute("SELECT verdict, status, reviewer, note FROM review WHERE founder_id=? "
+                          "ORDER BY round DESC LIMIT 1", (f["id"],)).fetchone()
+        if rv and rv["verdict"] == "awarded" and rv["status"] == "issued":
+            out.append({"founder_id": f["id"], "name": f["name"] or "", "company": f["company"] or "",
+                        "stage": f["stage"] or "", "sector": f["sector"] or "",
+                        "reviewer": rv["reviewer"] or "", "reviewer_note": rv["note"] or ""})
+    conn.close()
+    return out
+
+def dealflow_founders(investor_email):
+    # The screened deal-flow list — real VentureReady-marked founders — gated on
+    # the investor being approved AND having signed their NDA.
+    email = (investor_email or "").strip().lower()
+    conn = _db()
+    inv = conn.execute("SELECT * FROM investor WHERE email=?", (email,)).fetchone() if email else None
+    conn.close()
+    if not inv:
+        return {"locked": True, "reason": "sign_in", "founders": []}
+    if (inv["status"] or "") != "approved":
+        return {"locked": True, "reason": "not_approved", "status": inv["status"] or "pending",
+                "founders": []}
+    if not inv["nda_signed_at"]:
+        return {"locked": True, "reason": "nda", "founders": []}
+    return {"locked": False, "founders": _marked_founders()}
 
 INVESTOR_TEAM_SEATS = 3
 
@@ -1993,6 +2089,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/impact":
             # PUBLIC, showcase-safe aggregates only (no names, no individual amounts).
             return self._send(200, impact_public())
+        if path == "/api/dealflow":
+            # Screened deal flow — gated on approved + NDA-signed investor.
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            em = (qs.get("investor_email") or [""])[0]
+            return self._send(200, dealflow_founders(em))
         fp = os.path.join(HERE, path.lstrip("/"))
         if os.path.isfile(fp) and os.path.abspath(fp).startswith(HERE):
             ctype = "text/html" if fp.endswith(".html") else "application/octet-stream"
@@ -2220,6 +2321,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, out)
             elif self.path == "/api/investor/apply":
                 out = investor_apply(data)
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/investor/login":
+                out = investor_login(data.get("email", ""), data.get("password", ""))
+                self._send(401 if out.get("error") else 200, out)
+            elif self.path == "/api/investor/nda":
+                out = investor_sign_nda(data.get("email", ""), data.get("legal_name", ""))
                 self._send(out.get("status", 400) if out.get("error") else 200, out)
             elif self.path == "/api/admin/investors":
                 out = investor_list(data.get("credential", ""))

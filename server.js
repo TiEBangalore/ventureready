@@ -154,6 +154,13 @@ function db_init() {
     if (!rcols.includes("countersigned_by")) db.exec("ALTER TABLE review ADD COLUMN countersigned_by TEXT");
     if (!rcols.includes("countersigned_at")) db.exec("ALTER TABLE review ADD COLUMN countersigned_at TEXT");
   }
+  // Investors gain a real account (password/Google) and an NDA record.
+  {
+    const icols = db.prepare("PRAGMA table_info(investor)").all().map((r) => r.name);
+    for (const c of ["password_hash", "password_salt", "google_sub", "nda_signed_at", "nda_name"]) {
+      if (!icols.includes(c)) db.exec("ALTER TABLE investor ADD COLUMN " + c + " TEXT");
+    }
+  }
   // Deals: one founder<->investor relationship tracked from introduction to
   // outcome. This is the substrate for TiE's impact reporting. stage walks:
   // 'introduced' -> 'met' -> 'diligence' -> 'term_sheet' -> 'closed' | 'passed'.
@@ -922,6 +929,8 @@ function _investor_row(r) {
     recent_investments: r.recent_investments || "", status: r.status || "pending",
     parent_investor_id: r.parent_investor_id,
     decided_by: r.decided_by || "", decided_at: r.decided_at || "",
+    nda_signed_at: r.nda_signed_at || "", nda_name: r.nda_name || "",
+    nda_signed: !!r.nda_signed_at,
     created_at: r.created_at || "",
   };
 }
@@ -945,19 +954,32 @@ function investor_apply(d) {
   if (existing && (existing.status || "") === "approved") {
     return { error: "That email already has approved investor access. Please sign in instead.", status: 400 };
   }
+  // A password lets an approved investor sign back in later.
+  const password = d.password || "";
+  const [pw_hash, pw_salt] = password ? hash_pw(password) : [null, null];
   let iid;
   if (existing) {
-    db.prepare(
-      "UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, " +
-      "track_record=?, recent_investments=?, status='pending' WHERE id=?"
-    ).run(name, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record,
-      f.recent_investments, existing.id);
+    if (password) {
+      db.prepare(
+        "UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, " +
+        "track_record=?, recent_investments=?, status='pending', password_hash=?, password_salt=? WHERE id=?"
+      ).run(name, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record,
+        f.recent_investments, pw_hash, pw_salt, existing.id);
+    } else {
+      db.prepare(
+        "UPDATE investor SET name=?, firm=?, tie_status=?, cheque_size=?, focus=?, " +
+        "track_record=?, recent_investments=?, status='pending' WHERE id=?"
+      ).run(name, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record,
+        f.recent_investments, existing.id);
+    }
     iid = existing.id;
   } else {
     const cur = db.prepare(
       "INSERT INTO investor(name, email, firm, tie_status, cheque_size, focus, track_record, " +
-      "recent_investments, status, created_at) VALUES(?,?,?,?,?,?,?,?, 'pending', datetime('now'))"
-    ).run(name, email, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record, f.recent_investments);
+      "recent_investments, status, password_hash, password_salt, created_at) " +
+      "VALUES(?,?,?,?,?,?,?,?, 'pending', ?, ?, datetime('now'))"
+    ).run(name, email, f.firm, f.tie_status, f.cheque_size, f.focus, f.track_record,
+      f.recent_investments, pw_hash, pw_salt);
     iid = cur.lastInsertRowid;
   }
   const row = db.prepare("SELECT * FROM investor WHERE id=?").get(iid);
@@ -1006,6 +1028,66 @@ async function investor_decision(idToken, investor_id, decision, reason) {
     g.email + " " + decision + " " + who + " (" + row.email + ").", "normal");
   const listed = await investor_list(idToken);
   return { ok: true, investors: listed.investors || [] };
+}
+
+function investor_login(email, password) {
+  email = (email || "").trim().toLowerCase();
+  const row = db.prepare("SELECT * FROM investor WHERE email=?").get(email);
+  if (!row) return { error: "No investor application found for that email. Please apply first." };
+  if (!row.password_hash || !row.password_salt) {
+    return { error: "This investor account has no password set. Please re-apply to set one." };
+  }
+  const [calc] = hash_pw(password, row.password_salt);
+  if (!timing_safe_equal(calc, row.password_hash)) return { error: "Incorrect email or password." };
+  return { investor: _investor_row(row) };
+}
+
+function investor_sign_nda(email, legal_name) {
+  email = (email || "").trim().toLowerCase();
+  legal_name = (legal_name || "").trim();
+  if (!legal_name) return { error: "Please type your full legal name to sign.", status: 400 };
+  const row = db.prepare("SELECT * FROM investor WHERE email=?").get(email);
+  if (!row) return { error: "We couldn't find your investor record.", status: 404 };
+  if ((row.status || "") !== "approved") {
+    return { error: "Your access isn't approved yet, so the NDA can't be countersigned.", status: 403 };
+  }
+  db.prepare("UPDATE investor SET nda_signed_at=datetime('now'), nda_name=? WHERE id=?")
+    .run(legal_name, row.id);
+  const fresh = db.prepare("SELECT * FROM investor WHERE id=?").get(row.id);
+  notify("investor_nda_signed_admin", ["admins"],
+    "Investor NDA signed: " + (row.name || email),
+    (legal_name || row.name || email) + " signed the VentureReady NDA and now has deal-flow access.",
+    "normal");
+  return { investor: _investor_row(fresh) };
+}
+
+function _marked_founders() {
+  // Founders whose latest review is an ISSUED award — i.e. the mark is live.
+  const rows = db.prepare("SELECT id, name, company, stage, sector FROM founder ORDER BY id").all();
+  const out = [];
+  const rvStmt = db.prepare("SELECT verdict, status, reviewer, note FROM review WHERE founder_id=? ORDER BY round DESC LIMIT 1");
+  for (const f of rows) {
+    const rv = rvStmt.get(f.id);
+    if (rv && rv.verdict === "awarded" && rv.status === "issued") {
+      out.push({
+        founder_id: f.id, name: f.name || "", company: f.company || "",
+        stage: f.stage || "", sector: f.sector || "",
+        reviewer: rv.reviewer || "", reviewer_note: rv.note || "",
+      });
+    }
+  }
+  return out;
+}
+
+function dealflow_founders(investor_email) {
+  const email = (investor_email || "").trim().toLowerCase();
+  const inv = email ? db.prepare("SELECT * FROM investor WHERE email=?").get(email) : null;
+  if (!inv) return { locked: true, reason: "sign_in", founders: [] };
+  if ((inv.status || "") !== "approved") {
+    return { locked: true, reason: "not_approved", status: inv.status || "pending", founders: [] };
+  }
+  if (!inv.nda_signed_at) return { locked: true, reason: "nda", founders: [] };
+  return { locked: false, founders: _marked_founders() };
 }
 
 const INVESTOR_TEAM_SEATS = 3;
@@ -1906,6 +1988,10 @@ async function handleGet(req, res, urlObj) {
   if (p === "/api/impact") {
     return sendJson(res, 200, impact_public());
   }
+  if (p === "/api/dealflow") {
+    const em = urlObj.searchParams.get("investor_email") || "";
+    return sendJson(res, 200, dealflow_founders(em));
+  }
   const fp = path.join(HERE, p.replace(/^\/+/, ""));
   if (fs.existsSync(fp) && fs.statSync(fp).isFile() && path.resolve(fp).startsWith(HERE)) {
     const ctype = fp.endsWith(".html") ? "text/html" : "application/octet-stream";
@@ -2126,6 +2212,12 @@ async function handlePost(req, res, urlObj, data) {
     return sendJson(res, 200, out);
   } else if (p === "/api/investor/apply") {
     const out = investor_apply(data);
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/investor/login") {
+    const out = investor_login(data.email || "", data.password || "");
+    return sendJson(res, out.error ? 401 : 200, out);
+  } else if (p === "/api/investor/nda") {
+    const out = investor_sign_nda(data.email || "", data.legal_name || "");
     return sendJson(res, out.error ? (out.status || 400) : 200, out);
   } else if (p === "/api/admin/investors") {
     const out = await investor_list(data.credential || "");
