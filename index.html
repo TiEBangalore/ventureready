@@ -2142,6 +2142,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="overline" style="text-align:center;">Reviewer · TiE Charter Member</div>
       <h1 style="font-size:22px;font-weight:800;margin:6px 0 4px;text-align:center;">Reviewer sign-in</h1>
       <p class="sub" style="text-align:center;margin-bottom:20px;">Sign in to see the decks TiE has assigned you and submit your verdicts.</p>
+      <div class="form-group"><label>Full name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(only needed the first time)</span></label><input type="text" id="rv-name" placeholder="Your name"></div>
       <div class="form-group"><label>Email</label><input type="email" id="rv-email" placeholder="you@firm.com"></div>
       <div class="form-group"><label>Password</label><input type="password" id="rv-password" placeholder="Your password"></div>
       <div id="rv-error" style="display:none;font-size:13px;color:var(--red);margin-bottom:12px;"></div>
@@ -2162,10 +2163,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 <div id="screen-reviewer-dashboard" class="screen">
   <div class="profile-header">
     <div class="profile-header-inner">
-      <div class="profile-avatar-lg" style="background:#7C3AED;">RK</div>
+      <div class="profile-avatar-lg" id="rvp-avatar" style="background:#7C3AED;">RK</div>
       <div style="flex:1;">
-        <div class="profile-name">Rajan Kumar</div>
-        <div class="profile-sub">rajan@angel.in · TiE Charter Member · ex-VP Sales, Freshworks</div>
+        <div class="profile-name" id="rvp-name">Rajan Kumar</div>
+        <div class="profile-sub" id="rvp-sub">rajan@angel.in · TiE Charter Member · ex-VP Sales, Freshworks</div>
         <div class="profile-badges">
           <div class="rev-title rt-validator">Validator</div>
           <div style="font-size:10px;color:rgba(255,255,255,.4);">14 reviews completed · 86% inter-rater agreement</div>
@@ -5859,18 +5860,39 @@ async function reviewerSignup(){
   var email=v('rv-email'), pw=v('rv-password');
   _rvErr('');
   if(!email||!pw){ _rvErr('Enter the email TiE assigns your reviews to, and a password to create your account.'); return; }
+  var name=v('rv-name');
   try{
     var r=await fetch('/api/reviewer/signup',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:email,password:pw,name:''})});
+      body:JSON.stringify({email:email,password:pw,name:name})});
     var out=await r.json();
     if(out.error){ _rvErr(out.error); return; }
     _applyReviewer(out.reviewer);
   }catch(e){ _rvErr('Could not reach the server. Please try again.'); return; }
   loggedInAs='reviewer'; go('reviewer-dashboard');
 }
+function _initials(name){
+  var p=(name||'').trim().split(/\s+/);
+  return (((p[0]||'')[0]||'')+((p[p.length-1]||'')[0]||'')).toUpperCase() || 'TR';
+}
 function _applyReviewer(rec){
   if(!rec) return;
-  window._reviewerEmail=rec.email||''; window._reviewerName=rec.name||'';
+  var email=rec.email||'';
+  // If they signed up without a name, make a readable one from the email.
+  var name=(rec.name||'').trim();
+  if(!name && email){
+    name=email.split('@')[0].replace(/[._-]+/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+  }
+  window._reviewerEmail=email; window._reviewerName=name;
+  var ini=_initials(name);
+  // Drive the reviewer's OWN identity everywhere it shows (dashboard header + menu).
+  var av=document.getElementById('rvp-avatar'); if(av) av.textContent=ini;
+  var nm=document.getElementById('rvp-name'); if(nm) nm.textContent=name||email;
+  var sb=document.getElementById('rvp-sub'); if(sb) sb.textContent=(email?email+' · ':'')+'TiE Charter Member';
+  try{
+    PROFILES.reviewer.name=name||email; PROFILES.reviewer.initials=ini;
+    PROFILES.reviewer.rows=[['Email',email],['TiE role','Charter Member'],['Reviewer','Signed in']];
+    if(typeof renderProfileMenu==='function') renderProfileMenu('reviewer');
+  }catch(e){}
 }
 async function loadReviewerQueue(){
   var el=document.getElementById('reviewer-queue-live'); if(!el) return;
