@@ -3090,12 +3090,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div style="margin-top:auto;padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);">
       <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:8px;">Signed in as</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <div id="adminAvatar" style="width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;">RS</div>
+        <div id="adminAvatar" style="width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;">TA</div>
         <div style="flex:1;">
-          <div id="adminName" style="font-size:12px;font-weight:700;color:rgba(255,255,255,.85);">Ritu Sharma</div>
+          <div id="adminName" style="font-size:12px;font-weight:700;color:rgba(255,255,255,.85);">TiE Admin</div>
           <div id="adminRoleLine" style="font-size:10px;color:rgba(255,255,255,.35);">TiE Bangalore</div>
         </div>
-        <button onclick="toggleAdminUser()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px;cursor:pointer;">Switch</button>
       </div>
       <a onclick="loggedInAs=null;go('home')" style="font-size:11px;color:var(--red);cursor:pointer;display:block;margin-top:12px;">← Sign out</a>
     </div>
@@ -3942,8 +3941,6 @@ function switchPay(idx, el){
 }
 var loginRole = 'founder';
 var loggedInAs = null; // null | 'founder' | 'investor' | 'admin'
-var adminUsers = [{initials:'RS',name:'Ritu Sharma',color:'#C8202A'},{initials:'CB',name:'Chinmay Biliya',color:'#1D4ED8'}];
-var adminUserIdx = 0;
 
 function selectRole(role){
   loginRole = role;
@@ -4043,12 +4040,6 @@ function updateMarkEligibility(card){
     banner.style.cssText='background:var(--red-bg);border:1px solid var(--red-border);border-radius:6px;padding:10px 12px;margin-top:4px;font-size:12px;color:var(--red);font-weight:700;';
     banner.textContent='⊗ '+gapDim+' still at Tier '+maxTier+' — Not Yet (fix path issued to founder)';
   }
-}
-function toggleAdminUser(){
-  adminUserIdx = (adminUserIdx + 1) % adminUsers.length;
-  const u = adminUsers[adminUserIdx];
-  const av = document.getElementById('adminAvatar'); if(av){av.textContent=u.initials;av.style.background=u.color;}
-  const nm = document.getElementById('adminName'); if(nm) nm.textContent=u.name;
 }
 function goAdmin(page){
   loggedInAs = 'admin';
@@ -4857,8 +4848,8 @@ var PROFILES = {
     rows:[['Email','narendra@orbitventures.in'],['Firm','Orbit Ventures'],['Ticket size','₹25L – ₹2 Cr'],['Focus','B2B SaaS · Seed–Series A'],['NDA','Signed · 14 Mar 2026']] },
   reviewer:{ initials:'RK', color:'#7C3AED', name:'Rajan Kumar', role:'Expert Reviewer · Assessor', primaryLabel:'Reviewer dashboard', primaryScreen:'reviewer-dashboard',
     rows:[['Email','rajan.kumar@tiebangalore.org'],['TiE role','Charter Member'],['Background','Ex-VP Sales, Freshworks'],['Reviews done','12 · calibrated'],['Title','Assessor']] },
-  admin:{ initials:'RS', color:'#C8202A', name:'Ritu Sharma', role:'TiE Ops · Admin', primaryLabel:'Admin dashboard', primaryScreen:'admin',
-    rows:[['Email','ritu@tiebangalore.org'],['Org','TiE Bangalore'],['Role','Operations & Screening'],['Access','Full admin']] }
+  admin:{ initials:'TA', color:'#C8202A', name:'TiE Admin', role:'TiE Ops · Admin', primaryLabel:'Admin dashboard', primaryScreen:'admin',
+    rows:[['Org','TiE Bangalore'],['Role','Operations & Screening']] }
 };
 function renderProfileMenu(role){
   var p = PROFILES[role]; if(!p) return;
@@ -5154,6 +5145,15 @@ function _applyAdmin(out){
       var initials=((parts[0]||'')[0]||'')+((parts[1]||'')[0]||'');
       avEl.textContent=(initials||em[0]||'A').toUpperCase();
     }
+    // Keep the shared profile config in sync with the real admin too.
+    try{
+      var parts2=nm.split(/\s+/);
+      PROFILES.admin.name=nm;
+      PROFILES.admin.initials=((parts2[0]||'')[0]||'')+((parts2[1]||'')[0]||em[0]||'A');
+      PROFILES.admin.initials=PROFILES.admin.initials.toUpperCase();
+      PROFILES.admin.role=(out.role==='super-admin'?'Super Admin':'Admin')+' · TiE Bangalore';
+      PROFILES.admin.rows=[['Email',em],['Org','TiE Bangalore'],['Role',(out.role==='super-admin'?'Super Admin':'Admin')]];
+    }catch(e){}
     // Only the super-admin sees the "Admin Access" management page.
     window.__adminRole = out.role || '';
     var isSuper = (out.role==='super-admin');
@@ -6143,6 +6143,10 @@ function adminDemoSignIn(){
   var navS=document.getElementById('nav-section-settings');
   if(navA) navA.style.display='none';
   if(navS) navS.style.display='none';
+  // Demo has no verified identity — show a neutral label, never a fake persona.
+  var nm=document.getElementById('adminName'); if(nm) nm.textContent='TiE Admin (demo)';
+  var rl=document.getElementById('adminRoleLine'); if(rl) rl.textContent='Demo sign-in';
+  var av=document.getElementById('adminAvatar'); if(av) av.textContent='TA';
   loggedInAs='admin'; goAdmin('dashboard');
 }
 
