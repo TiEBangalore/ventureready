@@ -2168,8 +2168,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div class="profile-name" id="rvp-name">Rajan Kumar</div>
         <div class="profile-sub" id="rvp-sub">rajan@angel.in · TiE Charter Member · ex-VP Sales, Freshworks</div>
         <div class="profile-badges">
-          <div class="rev-title rt-validator">Validator</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.4);">14 reviews completed · 86% inter-rater agreement</div>
+          <div class="rev-title rt-validator" id="rvp-badge-title">Reviewer</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4);" id="rvp-badge-stats">TiE Charter Member</div>
         </div>
       </div>
       <div style="text-align:right;flex-shrink:0;margin-top:6px;">
@@ -2181,7 +2181,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
   <div class="shell">
     <!-- Title progress -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
+    <div id="rvp-progress-card" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
         <div style="font-size:13px;font-weight:700;">Reviewer title progress</div>
         <div class="rev-title rt-validator"><span class="tier-emblem">✅</span>Validator · 14 reviews</div>
@@ -2203,7 +2203,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
     </div>
 
-    <div class="metric-grid" style="margin-bottom:24px;">
+    <div class="metric-grid" id="rvp-metrics" style="margin-bottom:24px;">
       <div class="metric-card"><div class="metric-val">14</div><div class="metric-label">Reviews completed</div></div>
       <div class="metric-card"><div class="metric-val urgent">2</div><div class="metric-label">Assigned · pending</div><div class="metric-sub">1 overdue &gt;5 days</div></div>
       <div class="metric-card"><div class="metric-val">3.8</div><div class="metric-label">Avg. days to complete</div></div>
@@ -2232,12 +2232,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </table>
     </div>
 
-    <!-- Past reviews -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;">
+    <!-- Recent activity (real, from this reviewer's completed reviews) -->
+    <div id="rvp-activity" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;">
       <div style="font-size:13px;font-weight:700;margin-bottom:14px;">Recent activity</div>
-      <div class="activity-item"><div class="activity-dot ad-green"></div><div><strong>Review completed</strong> — Nestcrew · Verdict: Mark Awarded<br><span style="color:var(--mid);font-size:11px;">Founder earned the VentureReady mark · 1 week ago</span></div></div>
-      <div class="activity-item"><div class="activity-dot ad-green"></div><div><strong>Review completed</strong> — Loopwise · Verdict: Not Yet (GTM Sequencing gap)<br><span style="color:var(--mid);font-size:11px;">2 weeks ago · Founder re-validating</span></div></div>
-      <div class="activity-item"><div class="activity-dot ad-grey"></div><div><strong>Calibration spot-check</strong> — Blind review matched reference within 1 tier on all 4 dimensions<br><span style="color:var(--mid);font-size:11px;">1 month ago · Inter-rater score updated to 86%</span></div></div>
+      <div style="font-size:12px;color:var(--grey);">Sign in to see your completed reviews.</div>
     </div>
   </div>
 </div>
@@ -2252,9 +2250,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:26px;">
       <div>
         <button class="btn btn-outline" style="margin-bottom:14px;" onclick="go('reviewer-dashboard')">← Back to queue</button>
-        <div class="overline">Expert Review · B2B SaaS · Seed</div>
-        <h1 style="font-size:22px;font-weight:800;margin:6px 0 4px;">Stackr — Rohan Verma</h1>
-        <div style="font-size:12px;color:var(--grey);">Submitted 7 days ago · <span style="color:var(--red);font-weight:700;">SLA overdue</span> · AI prep packet ready</div>
+        <div class="overline" id="rvr-overline">Expert Review · B2B SaaS · Seed</div>
+        <h1 id="rvr-title" style="font-size:22px;font-weight:800;margin:6px 0 4px;">Stackr — Rohan Verma</h1>
+        <div style="font-size:12px;color:var(--grey);" id="rvr-sub">Submitted 7 days ago · <span style="color:var(--red);font-weight:700;">SLA overdue</span> · AI prep packet ready</div>
       </div>
       <div style="flex-shrink:0;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:14px 18px;min-width:190px;">
         <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#6D28D9;margin-bottom:8px;">3-Step Review</div>
@@ -5905,7 +5903,64 @@ async function loadReviewerQueue(){
     var r=await fetch('/api/reviewer/queue?email='+encodeURIComponent(window._reviewerEmail));
     var out=await r.json();
     _renderReviewerQueue(out.queue||[]);
+    renderReviewerStats(out.queue||[]);
   }catch(e){ el.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+// Reviewer title + metric cards + recent activity, from THIS reviewer's real queue.
+var RV_TIERS=[[1,5,'Assessor','🔍'],[6,15,'Validator','✅'],[16,30,'Senior Validator','⭐'],[31,1e9,'Chief Validator','👑']];
+function renderReviewerStats(queue){
+  var done=queue.filter(function(q){return q.review_status!=='not_started';});
+  var pending=queue.filter(function(q){return q.review_status==='not_started';}).length;
+  var issued=queue.filter(function(q){return q.review_status==='mark_issued';}).length;
+  var completed=done.length;
+  // Title band by completed count.
+  var band=RV_TIERS[0], next=null;
+  for(var i=0;i<RV_TIERS.length;i++){ if(completed>=RV_TIERS[i][0]){ band=RV_TIERS[i]; next=RV_TIERS[i+1]||null; } }
+  if(completed===0){ band=[0,0,'New reviewer','🔍']; next=RV_TIERS[0]; }
+  // Header badges (in the dark profile banner)
+  var bt=document.getElementById('rvp-badge-title'); if(bt) bt.textContent=band[2];
+  var bs=document.getElementById('rvp-badge-stats');
+  if(bs) bs.textContent = completed
+    ? (completed+' review'+(completed===1?'':'s')+' completed'+(issued?(' · '+issued+' mark'+(issued===1?'':'s')+' issued'):''))
+    : 'TiE Charter Member';
+  // Progress card
+  var pc=document.getElementById('rvp-progress-card');
+  if(pc){
+    var pct = next ? Math.min(100, Math.round((completed/next[0])*100)) : 100;
+    var nextLine = next
+      ? ('<strong>'+completed+' review'+(completed===1?'':'s')+' completed</strong> · '+(next[0]-completed)+' more to reach '+next[2]+' '+next[3])
+      : ('<strong>'+completed+' reviews completed</strong> · top tier reached '+band[3]);
+    pc.innerHTML=
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">'+
+        '<div style="font-size:13px;font-weight:700;">Reviewer title progress</div>'+
+        '<div class="rev-title rt-validator"><span class="tier-emblem">'+band[3]+'</span>'+_escapeHtml(band[2])+(completed?(' · '+completed+' review'+(completed===1?'':'s')):'')+'</div>'+
+      '</div>'+
+      '<div class="xp-bar"><div class="xp-fill" style="width:'+Math.max(pct,3)+'%;"></div></div>'+
+      '<div class="xp-next">'+nextLine+'</div>'+
+      '<div style="font-size:11px;color:var(--grey);margin-top:10px;">Titles: Assessor (1–5) · Validator (6–15) · Senior Validator (16–30) · Chief Validator (31+).</div>';
+  }
+  // Metric cards — all four are real
+  var mg=document.getElementById('rvp-metrics');
+  if(mg){
+    function card(val,label,sub,urgent){
+      return '<div class="metric-card"><div class="metric-val'+(urgent&&val?' urgent':'')+'">'+val+'</div>'+
+        '<div class="metric-label">'+label+'</div>'+(sub?'<div class="metric-sub">'+sub+'</div>':'')+'</div>';
+    }
+    mg.innerHTML=card(queue.length,'Assigned to you','')+card(pending,'Pending','awaiting your review',true)+
+      card(completed,'Reviews completed','')+card(issued,'Marks issued','countersigned by TiE');
+  }
+  // Recent activity — real completed reviews
+  var act=document.getElementById('rvp-activity');
+  if(act){
+    var LB={not_yet:['Verdict: Not Yet','ad-grey'],recommended:['Recommended — awaiting TiE countersign','ad-green'],
+      mark_issued:['Mark awarded','ad-green'],overridden:['Recommendation held by TiE','ad-grey']};
+    var rows=done.map(function(q){
+      var lb=LB[q.review_status]||['Reviewed','ad-grey'];
+      return '<div class="activity-item"><div class="activity-dot '+lb[1]+'"></div><div><strong>'+_escapeHtml(q.company||q.name||'Founder')+'</strong> — '+lb[0]+'<br><span style="color:var(--mid);font-size:11px;">'+_escapeHtml(q.name||'')+'</span></div></div>';
+    }).join('');
+    act.innerHTML='<div style="font-size:13px;font-weight:700;margin-bottom:14px;">Recent activity</div>'+
+      (rows||'<div style="font-size:12px;color:var(--grey);">No completed reviews yet. Once you submit a verdict it appears here.</div>');
+  }
 }
 var RV_STATUS={ not_started:['Not started','var(--red)'], not_yet:['Feedback given','#B45309'],
   recommended:['Awaiting countersign','#7C3AED'], mark_issued:['Mark issued','var(--green)'],
@@ -5932,8 +5987,17 @@ function _renderReviewerQueue(rows){
 }
 function openReviewFor(founderId, btn){
   window._reviewFounderId=founderId;
-  var name=''; try{ name=btn.closest('tr').querySelector('td strong').textContent; }catch(e){}
+  var name='', meta='';
+  try{
+    var tds=btn.closest('tr').querySelectorAll('td');
+    name=tds[0].querySelector('strong').textContent.trim();
+    meta=(tds[1].textContent||'').trim();   // "Company · Sector · Stage"
+  }catch(e){}
   window._reviewFounderName=name;
+  var company=(meta.split('·')[0]||'').trim();
+  var t=document.getElementById('rvr-title'); if(t) t.textContent=(company?company+' — ':'')+name;
+  var o=document.getElementById('rvr-overline'); if(o) o.textContent='Expert Review'+(meta?(' · '+meta.split('·').slice(1).join('·').trim()):'');
+  var s=document.getElementById('rvr-sub'); if(s) s.textContent='Assigned to you by TiE · score the rubric and submit your verdict below';
   go('reviewer-review');
 }
 
