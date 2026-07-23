@@ -667,6 +667,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <a onclick="go('member')">Membership</a>
     <a onclick="go('investor-apply')">For Investors</a>
     <a onclick="go('impact')">Impact</a>
+    <a onclick="openOnboarding()">How it works</a>
   </div>
   <!-- Logged-out state: home screen only -->
   <button class="btn btn-dark nav-cta" id="nav-auth-out" onclick="go('login')">Login / Sign up →</button>
@@ -695,6 +696,59 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     </div>
   </div>
 </nav>
+
+<!-- ══════════════════════════
+     FIRST-RUN WALKTHROUGH (role-aware onboarding overlay)
+══════════════════════════ -->
+<style>
+  .ob-overlay{ position:fixed; inset:0; background:rgba(15,12,10,.58); z-index:9999; display:none; align-items:center; justify-content:center; padding:20px; }
+  .ob-overlay.on{ display:flex; }
+  .ob-card{ background:#fff; border-radius:16px; max-width:460px; width:100%; padding:34px 30px 24px; position:relative; box-shadow:0 24px 70px rgba(0,0,0,.32); text-align:center; }
+  .ob-skip{ position:absolute; top:14px; right:16px; background:none; border:none; font-size:12px; color:var(--grey); cursor:pointer; }
+  .ob-step-count{ position:absolute; top:16px; left:18px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--grey); font-variant-numeric:tabular-nums; }
+  .ob-icon{ font-size:44px; line-height:1; margin-bottom:10px; }
+  .ob-eyebrow{ font-size:11px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase; color:var(--red); margin-bottom:8px; }
+  .ob-title{ font-size:22px; font-weight:800; margin:0 0 10px; color:var(--dark); line-height:1.2; }
+  .ob-body{ font-size:14px; color:var(--grey); line-height:1.6; margin:0 auto 20px; min-height:72px; max-width:38ch; }
+  .ob-dots{ display:flex; gap:7px; justify-content:center; margin-bottom:18px; }
+  .ob-dot{ width:8px; height:8px; border-radius:50%; background:var(--border); transition:background .2s; }
+  .ob-dot.on{ background:var(--red); }
+  .ob-actions{ display:flex; gap:10px; }
+  .ob-actions .btn{ flex:1; }
+  .ob-choose{ display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+  .ob-choose button{ text-align:left; padding:14px 16px; border:1.5px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; font-family:inherit; font-size:14px; font-weight:600; color:var(--dark); display:flex; align-items:center; gap:12px; }
+  .ob-choose button:hover{ border-color:var(--red); background:var(--red-bg); }
+  .ob-choose .em{ font-size:22px; }
+  .ob-choose small{ display:block; font-weight:400; color:var(--grey); font-size:12px; margin-top:2px; }
+</style>
+<div id="ob-overlay" class="ob-overlay" role="dialog" aria-modal="true" aria-labelledby="ob-title">
+  <div class="ob-card">
+    <div class="ob-step-count" id="ob-count"></div>
+    <button class="ob-skip" onclick="closeOnboarding()">Skip</button>
+    <div id="ob-steps">
+      <div class="ob-icon" id="ob-icon">🚀</div>
+      <div class="ob-eyebrow" id="ob-eyebrow">Getting started</div>
+      <h2 class="ob-title" id="ob-title">Welcome</h2>
+      <p class="ob-body" id="ob-body"></p>
+      <div class="ob-dots" id="ob-dots"></div>
+      <div class="ob-actions">
+        <button class="btn btn-outline" id="ob-back" onclick="obBack()">Back</button>
+        <button class="btn btn-red" id="ob-next" onclick="obNext()">Next →</button>
+      </div>
+    </div>
+    <div id="ob-chooser" style="display:none;">
+      <div class="ob-icon">👋</div>
+      <div class="ob-eyebrow">How VentureReady works</div>
+      <h2 class="ob-title">Which best describes you?</h2>
+      <div class="ob-choose">
+        <button onclick="startOnboarding('founder')"><span class="em">🚀</span><span>I'm a founder<small>Get investor-ready and earn the mark</small></span></button>
+        <button onclick="startOnboarding('investor')"><span class="em">🔎</span><span>I'm an investor<small>Get screened access to marked founders</small></span></button>
+        <button onclick="startOnboarding('reviewer')"><span class="em">✅</span><span>I'm a TiE reviewer<small>Assess decks and issue verdicts</small></span></button>
+      </div>
+      <div style="margin-top:16px;"><button class="btn btn-outline btn-full" onclick="closeOnboarding()">Close</button></div>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════
      SCREEN 1 — HOME
@@ -4953,6 +5007,7 @@ async function submitFounderSignup(){
     PROFILES.founder.rows = [['Email',payload.email],['Company',payload.company],['Stage · Sector',payload.stage+' · '+payload.sector],['Location',payload.city],['Member since','Just now']];
   }
   loggedInAs='founder'; go('upload');
+  startOnboarding('founder');   // first-run walkthrough
 }
 
 // Real login: verifies email + password against the backend, then loads the founder's own profile.
@@ -5311,7 +5366,8 @@ async function submitInvestorApplication(btn){
     window._investorName=out.investor.name; window._investorFirm=out.investor.firm;
     if(msg) msg.style.display='none';
     if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; }
-    go('investor-pending');
+    loggedInAs='investor'; go('investor-pending');
+    startOnboarding('investor');   // first-run walkthrough
   }catch(e){ show('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; btn.textContent='Submit Application →'; } }
 }
 
@@ -5837,6 +5893,77 @@ async function countersign(reviewId, decision, btn){
   }catch(e){ alert('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; } }
 }
 
+// ── First-run walkthrough (role-aware onboarding) ───────────────────────────
+var ONBOARDING = {
+  founder: { eyebrow:'Your founder journey', steps:[
+    {icon:'🔍', title:'Start with a free diagnostic', body:'Upload your deck and our AI reads your positioning, ICP, messaging and go-to-market in minutes. It\'s free — you don\'t even need an account to try it.'},
+    {icon:'🎟️', title:'Unlock expert review', body:'Join TiE Bangalore (Associate membership) or pay for a one-time expert review, so a real TiE Charter Member assesses your deck against the bar.'},
+    {icon:'📝', title:'Complete the questionnaire', body:'Answer structured questions on your positioning, ICP, differentiation and GTM — so your reviewer works from the same picture you do.'},
+    {icon:'✅', title:'Get your verdict', body:'Most founders get a "Not Yet" first — with a clear list of gaps to close and one free re-review. It\'s a path, not a rejection.'},
+    {icon:'🏆', title:'Earn the mark, get discovered', body:'Clear all four dimensions and, once TiE countersigns, you earn the VentureReady mark — and screened investors can find you.'},
+    {icon:'🤝', title:'Track your conversations', body:'Keep each investor conversation updated on your profile. It\'s how TiE measures the real impact your mark creates.'}
+  ]},
+  investor: { eyebrow:'Your investor journey', steps:[
+    {icon:'📄', title:'Apply for screened access', body:'Tell us about your fund and track record. Every investor is individually reviewed by TiE — Charter status doesn\'t skip the gate.'},
+    {icon:'⏳', title:'TiE reviews your application', body:'You\'ll hear back within a few business days. If approved, you move on to signing your NDA.'},
+    {icon:'✍️', title:'Sign your NDA', body:'A one-time agreement, per person, before you can view any founder material — it protects the founders who trust the platform.'},
+    {icon:'👥', title:'Add your firm\'s team', body:'Invite up to three colleagues. Each signs their own NDA — your signature doesn\'t cover them.'},
+    {icon:'🔎', title:'Browse screened deal flow', body:'See only founders who\'ve earned the VentureReady mark, and open their pitch decks and data rooms.'},
+    {icon:'🤝', title:'Meet founders through TiE', body:'Request an introduction and TiE facilitates it. When a deal progresses, you and the founder confirm the outcome together.'}
+  ]},
+  reviewer: { eyebrow:'Your reviewer journey', steps:[
+    {icon:'👋', title:'Welcome, Charter Member', body:'As a TiE Charter Member, you bring the senior judgment that makes the VentureReady mark actually mean something.'},
+    {icon:'📥', title:'See your assigned decks', body:'TiE assigns you founders to review. They appear on your dashboard the moment they\'re assigned to your email — nobody else\'s.'},
+    {icon:'📊', title:'Score the rubric', body:'Work from the AI prep packet and score four dimensions — positioning, ICP, messaging and GTM — against the tier bar.'},
+    {icon:'🗳️', title:'Submit your verdict', body:'A "Not Yet" goes to the founder as coaching. Recommending the mark sends it to TiE — you recommend, TiE countersigns before it goes live.'},
+    {icon:'🎖️', title:'Grow your reviewer title', body:'Your completed reviews build your title over time, from Assessor through to Chief Validator.'}
+  ]},
+  admin: { eyebrow:'Your Team Portal', steps:[
+    {icon:'🗂️', title:'One inbox for what needs you', body:'The Notifications feed surfaces every event that needs a TiE human — applications, verdicts to countersign, meeting requests and more.'},
+    {icon:'✅', title:'Approve investors & assign reviews', body:'Screen investor applications and assign incoming founder decks to the right Charter Member reviewer.'},
+    {icon:'🖋️', title:'Countersign the mark', body:'A reviewer\'s award is only a recommendation until you countersign — the final gate before a founder\'s mark goes live.'},
+    {icon:'📈', title:'Track TiE\'s impact', body:'The Deal Flow & Impact dashboard turns real founder–investor outcomes into TiE\'s attributable impact numbers.'}
+  ]}
+};
+var _ob = { role:null, i:0 };
+function _obEl(id){ return document.getElementById(id); }
+// Open the walkthrough. With no role (e.g. from the nav), show a chooser first.
+function openOnboarding(role){
+  role = role || (typeof loggedInAs!=='undefined' && loggedInAs) || null;
+  if(role && ONBOARDING[role]){ startOnboarding(role); return; }
+  _obEl('ob-steps').style.display='none';
+  _obEl('ob-chooser').style.display='';
+  _obEl('ob-count').textContent='';
+  _obEl('ob-overlay').classList.add('on');
+}
+function startOnboarding(role){
+  if(!ONBOARDING[role]) return;
+  _ob.role=role; _ob.i=0;
+  _obEl('ob-chooser').style.display='none';
+  _obEl('ob-steps').style.display='';
+  _obEl('ob-overlay').classList.add('on');
+  _obRender();
+}
+function _obRender(){
+  var cfg=ONBOARDING[_ob.role]; if(!cfg) return;
+  var s=cfg.steps[_ob.i], last=(_ob.i===cfg.steps.length-1);
+  _obEl('ob-icon').textContent=s.icon;
+  _obEl('ob-eyebrow').textContent=cfg.eyebrow;
+  _obEl('ob-title').textContent=s.title;
+  _obEl('ob-body').textContent=s.body;
+  _obEl('ob-count').textContent=(_ob.i+1)+' / '+cfg.steps.length;
+  _obEl('ob-back').style.visibility = _ob.i===0 ? 'hidden' : 'visible';
+  _obEl('ob-next').textContent = last ? 'Get started →' : 'Next →';
+  _obEl('ob-dots').innerHTML = cfg.steps.map(function(_,i){ return '<div class="ob-dot'+(i===_ob.i?' on':'')+'"></div>'; }).join('');
+}
+function obNext(){
+  var cfg=ONBOARDING[_ob.role]; if(!cfg) return;
+  if(_ob.i>=cfg.steps.length-1){ closeOnboarding(); return; }
+  _ob.i++; _obRender();
+}
+function obBack(){ if(_ob.i>0){ _ob.i--; _obRender(); } }
+function closeOnboarding(){ var o=_obEl('ob-overlay'); if(o) o.classList.remove('on'); }
+
 // ---- Reviewer (TiE Charter Member) sign-in + real assigned queue ----------
 function _rvErr(msg){ var e=document.getElementById('rv-error'); if(e){ e.style.display=msg?'':'none'; e.textContent=msg||''; } }
 async function reviewerLogin(){
@@ -5867,6 +5994,7 @@ async function reviewerSignup(){
     _applyReviewer(out.reviewer);
   }catch(e){ _rvErr('Could not reach the server. Please try again.'); return; }
   loggedInAs='reviewer'; go('reviewer-dashboard');
+  startOnboarding('reviewer');   // first-run walkthrough
 }
 function _initials(name){
   var p=(name||'').trim().split(/\s+/);
