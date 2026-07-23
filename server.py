@@ -122,6 +122,21 @@ def db_init():
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
         startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
         status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)""")
+    # Reviewers (TiE Charter Members). Same auth shape as founders: password OR
+    # Google. TiE controls who reviews by assigning decks to a reviewer's email.
+    conn.execute("""CREATE TABLE IF NOT EXISTS reviewer(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE,
+        password_hash TEXT, password_salt TEXT, google_sub TEXT, created_at TEXT)""")
+    # Review lifecycle: an AWARD is only a recommendation until an admin
+    # countersigns it. Migrate older review rows (which had no status) to
+    # 'issued' so nothing already decided is re-opened.
+    _rcols = [r["name"] for r in conn.execute("PRAGMA table_info(review)").fetchall()]
+    if "status" not in _rcols:
+        conn.execute("ALTER TABLE review ADD COLUMN status TEXT DEFAULT 'issued'")
+    if "countersigned_by" not in _rcols:
+        conn.execute("ALTER TABLE review ADD COLUMN countersigned_by TEXT")
+    if "countersigned_at" not in _rcols:
+        conn.execute("ALTER TABLE review ADD COLUMN countersigned_at TEXT")
     # Deals: one founder<->investor relationship tracked from introduction to
     # outcome. This is the substrate for TiE's impact reporting. stage walks:
     # 'introduced' -> 'met' -> 'diligence' -> 'term_sheet' -> 'closed' | 'passed'.
@@ -317,27 +332,27 @@ FREE_REREVIEW_ROUND = 2      # round 1 = paid review, round 2 = the single free 
 REREVIEW_FEE = "₹3,000 + GST"
 
 def review_add(founder_id, verdict, gaps, reviewer, note):
-    """Record a reviewer's verdict as the next round for this founder."""
+    """Record a reviewer's verdict as the next round. An AWARD is only a
+    RECOMMENDATION ('recommended') until an admin countersigns it — the founder
+    is not told and the mark is not live yet. A 'not yet' is coaching, so it is
+    'issued' straight away and the founder sees the feedback."""
+    status = "recommended" if verdict == "awarded" else "issued"
     conn = _db()
     last = conn.execute("SELECT MAX(round) m FROM review WHERE founder_id=?", (founder_id,)).fetchone()
     rnd = (last["m"] or 0) + 1
-    conn.execute("INSERT INTO review(founder_id,round,verdict,gaps_json,reviewer,note,created_at) "
-                 "VALUES(?,?,?,?,?,?,datetime('now'))",
-                 (founder_id, rnd, verdict, json.dumps(gaps or []), reviewer or "TiE Reviewer", note or ""))
+    conn.execute("INSERT INTO review(founder_id,round,verdict,gaps_json,reviewer,note,status,created_at) "
+                 "VALUES(?,?,?,?,?,?,?,datetime('now'))",
+                 (founder_id, rnd, verdict, json.dumps(gaps or []), reviewer or "TiE Reviewer", note or "", status))
     conn.commit()
     conn.close()
     fb = _founder_brief(founder_id)
     if verdict == "awarded":
-        if fb["email"]:
-            notify("mark_awarded", [fb["email"]],
-                   "You have earned the VentureReady mark",
-                   "Congratulations " + (fb["name"] or "") +
-                   " — your venture has been awarded the VentureReady mark. Screened investors can now discover your profile.",
-                   "high")
-        notify("mark_awarded_admin", ["admins"],
-               "VentureReady mark awarded",
-               "The VentureReady mark was awarded to " +
-               (fb["name"] or ("founder #" + str(founder_id))) + ".", "normal")
+        # Founder is NOT told yet — this is awaiting TiE's countersign.
+        notify("verdict_pending_countersign", ["admins"],
+               "Verdict to countersign: " + (fb["name"] or ("founder #" + str(founder_id))),
+               (reviewer or "A reviewer") + " recommends awarding the VentureReady mark to " +
+               (fb["name"] or ("founder #" + str(founder_id))) +
+               ". Countersign in the Team Portal to issue it.", "high")
     else:
         if fb["email"]:
             notify("review_feedback", [fb["email"]],
@@ -350,16 +365,33 @@ def review_add(founder_id, verdict, gaps, reviewer, note):
                (fb["name"] or ("founder #" + str(founder_id))) + ".", "normal")
     return review_state(founder_id)
 
+def _founder_visible_verdict(row):
+    """What the FOUNDER should see for a review row, honouring the countersign
+    gate: a recommended award reads as 'in_review' (not the mark yet); an
+    overridden award reads as 'not_yet' (withheld — back to the feedback path)."""
+    if row is None:
+        return None
+    v, st = row.get("verdict"), (row.get("status") or "issued")
+    if v == "awarded" and st == "recommended":
+        return "in_review"
+    if v == "awarded" and st == "overridden":
+        return "not_yet"
+    return v
+
 def review_state(founder_id):
     """Everything the founder's screens need: history, latest verdict, and whether
-    the next re-review is the free one or has to be paid for."""
+    the next re-review is the free one or has to be paid for. Awards that haven't
+    been countersigned are shown as 'in_review', never as the live mark."""
     conn = _db()
     rows = [dict(r) for r in conn.execute(
-        "SELECT round,verdict,gaps_json,reviewer,note,created_at FROM review "
+        "SELECT round,verdict,gaps_json,reviewer,note,status,created_at FROM review "
         "WHERE founder_id=? ORDER BY round", (founder_id,)).fetchall()]
     conn.close()
     for r in rows:
         r["gaps"] = json.loads(r.pop("gaps_json") or "[]")
+        # Present the founder-visible verdict; keep the raw one for admins/debug.
+        r["raw_verdict"] = r["verdict"]
+        r["verdict"] = _founder_visible_verdict(r)
     latest = rows[-1] if rows else None
     rounds_done = len(rows)
     next_round = rounds_done + 1
@@ -368,12 +400,205 @@ def review_state(founder_id):
         "latest": latest,
         "rounds_done": rounds_done,
         "next_round": next_round,
-        # The single free re-review is round 2 and only if they haven't already earned the mark.
+        # The single free re-review is round 2 and only if they haven't earned the mark.
         "free_rereview_available": (next_round == FREE_REREVIEW_ROUND
                                     and bool(latest) and latest["verdict"] == "not_yet"),
         "free_rereview_used": rounds_done >= FREE_REREVIEW_ROUND,
         "rereview_fee": REREVIEW_FEE,
     }
+
+# ---- Reviewers (accounts, queue, gated verdict submission) -----------------
+def _public_reviewer(row):
+    if row is None:
+        return None
+    out = dict(row)
+    out.pop("password_hash", None)
+    out.pop("password_salt", None)
+    return out
+
+def reviewer_signup(d):
+    email = (d.get("email") or "").strip().lower()
+    password = d.get("password") or ""
+    if not email or not password:
+        return {"error": "Email and password are required."}
+    conn = _db()
+    existing = conn.execute("SELECT * FROM reviewer WHERE email=?", (email,)).fetchone()
+    if existing and existing["password_hash"]:
+        conn.close()
+        return {"error": "That email is already registered. Please log in instead."}
+    pw_hash, pw_salt = _hash_pw(password)
+    if existing:
+        conn.execute("UPDATE reviewer SET name=?, password_hash=?, password_salt=? WHERE id=?",
+                     (d.get("name", ""), pw_hash, pw_salt, existing["id"]))
+        rid = existing["id"]
+    else:
+        cur = conn.execute("INSERT INTO reviewer(name,email,password_hash,password_salt,created_at) "
+                           "VALUES(?,?,?,?,datetime('now'))",
+                           (d.get("name", ""), email, pw_hash, pw_salt))
+        rid = cur.lastrowid
+    conn.commit()
+    row = conn.execute("SELECT * FROM reviewer WHERE id=?", (rid,)).fetchone()
+    conn.close()
+    return {"reviewer": _public_reviewer(row)}
+
+def reviewer_login(email, password):
+    conn = _db()
+    email = (email or "").strip().lower()
+    row = conn.execute("SELECT * FROM reviewer WHERE email=?", (email,)).fetchone()
+    conn.close()
+    if not row or not row["password_hash"] or not row["password_salt"]:
+        return {"error": "No reviewer account found for that email, or it has no password set."}
+    calc, _ = _hash_pw(password, row["password_salt"])
+    if not hmac.compare_digest(calc, row["password_hash"]):
+        return {"error": "Incorrect email or password."}
+    return {"reviewer": _public_reviewer(row)}
+
+def reviewer_google_login(id_token):
+    v = verify_google_token(id_token)
+    if v.get("error"):
+        return {"error": v["error"]}
+    sub, email, name = v["sub"], (v["email"] or "").strip().lower(), v["name"]
+    conn = _db()
+    row = conn.execute("SELECT * FROM reviewer WHERE google_sub=?", (sub,)).fetchone()
+    if not row and email:
+        row = conn.execute("SELECT * FROM reviewer WHERE email=?", (email,)).fetchone()
+    if row:
+        conn.execute("UPDATE reviewer SET google_sub=?, name=COALESCE(NULLIF(name,''), ?) WHERE id=?",
+                     (sub, name or "", row["id"]))
+        rid = row["id"]
+    else:
+        cur = conn.execute("INSERT INTO reviewer(name,email,google_sub,created_at) "
+                           "VALUES(?,?,?,datetime('now'))", (name or "TiE Reviewer", email, sub))
+        rid = cur.lastrowid
+    conn.commit()
+    row = conn.execute("SELECT * FROM reviewer WHERE id=?", (rid,)).fetchone()
+    conn.close()
+    return {"reviewer": _public_reviewer(row)}
+
+def reviewer_queue(email):
+    """A reviewer's own assigned decks: latest assignment per founder, joined with
+    the founder brief and the current review status for that founder."""
+    email = (email or "").strip().lower()
+    if not email:
+        return []
+    conn = _db()
+    rows = conn.execute(
+        "SELECT a.founder_id, a.created_at AS assigned_at, a.sla_due, a.status AS assign_status "
+        "FROM review_assignment a "
+        "WHERE a.reviewer_email=? AND a.id IN "
+        "  (SELECT MAX(id) FROM review_assignment WHERE reviewer_email=? GROUP BY founder_id) "
+        "ORDER BY a.id DESC", (email, email)).fetchall()
+    out = []
+    for a in rows:
+        fb = _founder_brief(a["founder_id"])
+        f = conn.execute("SELECT stage, sector FROM founder WHERE id=?", (a["founder_id"],)).fetchone()
+        rv = conn.execute("SELECT verdict, status FROM review WHERE founder_id=? ORDER BY round DESC LIMIT 1",
+                          (a["founder_id"],)).fetchone()
+        review_status = "not_started"
+        if rv:
+            if rv["verdict"] == "awarded" and rv["status"] == "recommended":
+                review_status = "recommended"
+            elif rv["verdict"] == "awarded" and rv["status"] == "issued":
+                review_status = "mark_issued"
+            elif rv["verdict"] == "awarded" and rv["status"] == "overridden":
+                review_status = "overridden"
+            else:
+                review_status = "not_yet"
+        out.append({"founder_id": a["founder_id"], "name": fb.get("name", ""),
+                    "company": fb.get("company", ""), "stage": (f["stage"] if f else "") or "",
+                    "sector": (f["sector"] if f else "") or "",
+                    "assigned_at": a["assigned_at"] or "", "sla_due": a["sla_due"] or "",
+                    "review_status": review_status})
+    conn.close()
+    return out
+
+def reviewer_submit(reviewer_email, founder_id, verdict, gaps, note):
+    """A reviewer submits a verdict — allowed ONLY for a founder actually assigned
+    to them. Award becomes a recommendation awaiting countersign."""
+    reviewer_email = (reviewer_email or "").strip().lower()
+    if verdict not in ("not_yet", "awarded"):
+        return {"error": "verdict must be 'not_yet' or 'awarded'.", "status": 400}
+    conn = _db()
+    a = conn.execute("SELECT * FROM review_assignment WHERE founder_id=? AND reviewer_email=? "
+                     "ORDER BY id DESC LIMIT 1", (founder_id, reviewer_email)).fetchone()
+    rname = None
+    if a:
+        rname = a["reviewer_name"]
+    else:
+        r = conn.execute("SELECT name FROM reviewer WHERE email=?", (reviewer_email,)).fetchone()
+        rname = r["name"] if r else None
+    if not a:
+        conn.close()
+        return {"error": "This founder isn't assigned to you. Ask TiE to assign it first.",
+                "status": 403}
+    conn.execute("UPDATE review_assignment SET status='reviewed' WHERE id=?", (a["id"],))
+    conn.commit()
+    conn.close()
+    return review_add(founder_id, verdict, gaps, rname or reviewer_email, note)
+
+def pending_verdicts(id_token):
+    """Admin: awards a reviewer has recommended, awaiting countersign."""
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    conn = _db()
+    rows = conn.execute(
+        "SELECT id, founder_id, round, gaps_json, reviewer, note, created_at "
+        "FROM review WHERE verdict='awarded' AND status='recommended' ORDER BY id DESC").fetchall()
+    out = []
+    for r in rows:
+        fb = _founder_brief(r["founder_id"])
+        out.append({"review_id": r["id"], "founder_id": r["founder_id"], "name": fb.get("name", ""),
+                    "company": fb.get("company", ""), "round": r["round"],
+                    "reviewer": r["reviewer"] or "", "note": r["note"] or "",
+                    "gaps": json.loads(r["gaps_json"] or "[]"), "created_at": r["created_at"] or ""})
+    conn.close()
+    return {"pending": out}
+
+def review_countersign(id_token, review_id, decision, note):
+    """Admin: issue the mark (final) or override (withhold). Only now is the
+    founder told about an award."""
+    g = require_admin(id_token)
+    if g.get("error"):
+        return g
+    if decision not in ("issue", "override"):
+        return {"error": "decision must be 'issue' or 'override'.", "status": 400}
+    conn = _db()
+    row = conn.execute("SELECT * FROM review WHERE id=? AND verdict='awarded' AND status='recommended'",
+                       (review_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "No pending recommendation found for that review.", "status": 404}
+    fid = row["founder_id"]
+    new_status = "issued" if decision == "issue" else "overridden"
+    conn.execute("UPDATE review SET status=?, countersigned_by=?, countersigned_at=datetime('now') WHERE id=?",
+                 (new_status, g["email"], review_id))
+    conn.commit()
+    conn.close()
+    fb = _founder_brief(fid)
+    if decision == "issue":
+        if fb["email"]:
+            notify("mark_awarded", [fb["email"]],
+                   "You have earned the VentureReady mark",
+                   "Congratulations " + (fb["name"] or "") +
+                   " — TiE has countersigned your review and awarded the VentureReady mark. "
+                   "Screened investors can now discover your profile.", "high")
+        notify("mark_awarded_admin", ["admins"],
+               "VentureReady mark issued",
+               g["email"] + " countersigned and issued the mark to " +
+               (fb["name"] or ("founder #" + str(fid))) + ".", "normal")
+    else:
+        if fb["email"]:
+            notify("mark_withheld", [fb["email"]],
+                   "An update on your VentureReady review",
+                   "After TiE's final review, the mark is being held for now" +
+                   ((" — note: " + note) if note else "") +
+                   ". Please see your feedback for what to strengthen before the next round.", "normal")
+        notify("mark_withheld_admin", ["admins"],
+               "Mark recommendation overridden",
+               g["email"] + " overrode the recommended mark for " +
+               (fb["name"] or ("founder #" + str(fid))) + ".", "normal")
+    return {"ok": True, "pending": pending_verdicts(id_token).get("pending", [])}
 
 # ---- Data room (diligence documents) ----
 DATAROOM_DIR = os.path.join(HERE, "dataroom")
@@ -1761,6 +1986,10 @@ class Handler(BaseHTTPRequestHandler):
             fid = (qs.get("founder_id") or [""])[0]
             iem = (qs.get("investor_email") or [""])[0]
             return self._send(200, {"deals": deals_for(fid or None, iem or None)})
+        if path == "/api/reviewer/queue":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            em = (qs.get("email") or [""])[0]
+            return self._send(200, {"queue": reviewer_queue(em)})
         if path == "/api/impact":
             # PUBLIC, showcase-safe aggregates only (no names, no individual amounts).
             return self._send(200, impact_public())
@@ -1926,6 +2155,32 @@ class Handler(BaseHTTPRequestHandler):
                         ) + (result.get("summary") or "")
                     result["deck_id"] = deck_id
                     self._send(200, result)
+            elif self.path == "/api/reviewer/signup":
+                out = reviewer_signup(data)
+                self._send(400 if out.get("error") else 200, out)
+            elif self.path == "/api/reviewer/login":
+                out = reviewer_login(data.get("email", ""), data.get("password", ""))
+                self._send(401 if out.get("error") else 200, out)
+            elif self.path == "/api/reviewer/auth/google":
+                out = reviewer_google_login(data.get("credential", ""))
+                self._send(401 if out.get("error") else 200, out)
+            elif self.path == "/api/reviewer/submit":
+                out = reviewer_submit(data.get("reviewer_email", ""), data.get("founder_id"),
+                                      data.get("verdict", ""), data.get("gaps"), data.get("note", ""))
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/admin/pending-verdicts":
+                out = pending_verdicts(data.get("credential", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 403), {"error": out["error"]})
+                else:
+                    self._send(200, out)
+            elif self.path == "/api/review/countersign":
+                out = review_countersign(data.get("credential", ""), data.get("review_id"),
+                                         data.get("decision", ""), data.get("note", ""))
+                if out.get("error"):
+                    self._send(out.get("status", 400), {"error": out["error"]})
+                else:
+                    self._send(200, out)
             elif self.path == "/api/deal/create":
                 out = deal_create(data)
                 self._send(out.get("status", 400) if out.get("error") else 200, out)

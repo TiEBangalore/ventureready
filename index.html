@@ -897,7 +897,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <button class="btn btn-red" onclick="demoFounder()" style="font-size:12px;">Demo: Founder →</button>
           <button class="btn btn-dark" onclick="loggedInAs='investor';go('investor-dealflow')" style="font-size:12px;">Demo: Investor →</button>
         </div>
-        <button class="btn btn-outline btn-full" onclick="loggedInAs='reviewer';go('reviewer-dashboard')" style="font-size:12px;">Demo: Reviewer (TiE Charter Member) →</button>
+        <button class="btn btn-outline btn-full" onclick="go('reviewer-login')" style="font-size:12px;">Reviewer sign-in (TiE Charter Member) →</button>
       </div>
 
       <div class="login-foot" style="margin-top:14px;">By continuing you agree to TiE Bangalore's <a onclick="go('terms')" style="color:var(--red);cursor:pointer;">Terms</a> and <a onclick="go('privacy')" style="color:var(--red);cursor:pointer;">Privacy Policy</a>.</div>
@@ -2131,6 +2131,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 </div>
 
 <!-- ══════════════════════════
+     REVIEWER SIGN-IN (TiE Charter Member)
+══════════════════════════ -->
+<div id="screen-reviewer-login" class="screen">
+  <div class="login-bg">
+    <div class="login-card center-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;justify-content:center;">
+        <img class="tie-logo-dark" alt="TiE Bangalore" style="height:30px;width:auto;">
+      </div>
+      <div class="overline" style="text-align:center;">Reviewer · TiE Charter Member</div>
+      <h1 style="font-size:22px;font-weight:800;margin:6px 0 4px;text-align:center;">Reviewer sign-in</h1>
+      <p class="sub" style="text-align:center;margin-bottom:20px;">Sign in to see the decks TiE has assigned you and submit your verdicts.</p>
+      <div class="form-group"><label>Email</label><input type="email" id="rv-email" placeholder="you@firm.com"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="rv-password" placeholder="Your password"></div>
+      <div id="rv-error" style="display:none;font-size:13px;color:var(--red);margin-bottom:12px;"></div>
+      <button class="btn btn-red btn-full btn-lg" onclick="reviewerLogin()">Sign In →</button>
+      <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--mid);">
+        First time? <a onclick="reviewerSignup()" style="color:var(--red);cursor:pointer;font-weight:600;">Create your reviewer account</a>
+      </div>
+      <div style="text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <a onclick="go('login')" style="font-size:12px;color:var(--mid);cursor:pointer;">← Back to sign-in options</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
      REVIEWER DASHBOARD
 ══════════════════════════ -->
 <div id="screen-reviewer-dashboard" class="screen">
@@ -2183,10 +2209,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="metric-card"><div class="metric-val">86%</div><div class="metric-label">Inter-rater agreement</div><div class="metric-sub">Calibrated ✓</div></div>
     </div>
 
-    <!-- Review queue -->
+    <!-- Live assigned reviews (real, once signed in) -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;">Your assigned reviews</div>
+        <button class="btn-xs" onclick="loadReviewerQueue()">Refresh</button>
+      </div>
+      <div id="reviewer-queue-live"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+    </div>
+
+    <!-- Review queue (sample) -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Assigned reviews</div>
-      <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:8px;padding:8px 12px;font-size:11px;color:#475569;line-height:1.5;margin-bottom:14px;">These are <strong style="color:#334155;">sample</strong> assignments for demonstration. Real founder decks appear here once TiE assigns them to you.</div>
+      <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample assignments (illustrative)</div>
+      <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:8px;padding:8px 12px;font-size:11px;color:#475569;line-height:1.5;margin-bottom:14px;">These are <strong style="color:#334155;">sample</strong> assignments for demonstration. Real founder decks appear in the panel above once TiE assigns them to you.</div>
       <table class="admin-table">
         <thead><tr><th>Founder</th><th>Startup · Sector</th><th>Submitted</th><th>SLA</th><th>Action</th></tr></thead>
         <tbody>
@@ -3142,7 +3177,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <h1>Pending Verdicts</h1>
         <p>Reviewer has submitted a recommendation. Your countersign is the final gate before the mark is issued or withheld.</p>
       </div>
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;">Awaiting your countersign — real recommendations</div>
+          <button class="btn-xs" onclick="loadPendingVerdicts()">Refresh</button>
+        </div>
+        <div id="admin-verdicts-live"><p style="font-size:12px;color:var(--grey);">Loading…</p></div>
+      </div>
       <div class="admin-card">
+        <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample verdict (illustrative)</div>
         <table class="admin-table">
           <thead><tr><th>Founder</th><th>Startup</th><th>Reviewer</th><th>Recommendation</th><th>Scores (all 4 dims)</th><th>Action</th></tr></thead>
           <tbody>
@@ -3979,6 +4022,7 @@ function showAdminPage(page, el){
   if(page==='applications' && typeof loadInvestors==='function') loadInvestors();
   if(page==='meetings' && typeof loadMeetings==='function') loadMeetings();
   if(page==='dealflow' && typeof loadDeals==='function') loadDeals();
+  if(page==='verdicts' && typeof loadPendingVerdicts==='function') loadPendingVerdicts();
 }
 function handleNdaContinue(){
   const isFree = document.getElementById('memberToggle').value === 'free';
@@ -4480,20 +4524,29 @@ async function submitVerdict(verdict){
     }
   });
   if(verdict === 'not_yet' && !gaps.length) gaps = SAMPLE_GAPS;
-  if(!window._founderId){
-    alert('Verdict recorded (demo).\n\nNo founder is signed in on this browser, so there is no record to attach it to.');
+  // Real reviewer flow: submit against the founder TiE assigned to this reviewer.
+  var founderId = window._reviewFounderId || window._founderId;
+  if(!window._reviewerEmail){
+    alert('Please sign in as a reviewer first, then open a deck from your assigned queue.');
     return;
   }
+  if(!founderId){
+    alert('Open a deck from your assigned queue first, so the verdict has a founder to attach to.');
+    return;
+  }
+  var note = verdict==='not_yet'
+    ? 'Strong team and a real wedge — but the buyer and the route to them still aren\'t specific enough to put in front of investors.'
+    : 'Cleared the bar on all four dimensions. Ready for institutional conversations.';
   try{
-    var r = await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({founder_id:window._founderId, verdict:verdict, gaps:gaps,
-        reviewer:'Rajan Kumar', note: verdict==='not_yet'
-          ? 'Strong team and a real wedge — but the buyer and the route to them still aren\'t specific enough to put in front of investors.'
-          : 'Cleared the bar on all four dimensions. Ready for institutional conversations.'})});
+    var r = await fetch('/api/reviewer/submit',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({reviewer_email:window._reviewerEmail, founder_id:founderId,
+        verdict:verdict, gaps:gaps, note:note})});
     var st = await r.json();
+    if(st.error){ alert(st.error); return; }
     alert(verdict==='not_yet'
-      ? 'Verdict submitted: NOT YET.\n\nThe founder now sees the gap list and their free re-review.\n\n(Round '+st.rounds_done+' · free re-review available: '+st.free_rereview_available+')'
-      : 'Verdict submitted: AWARD MARK — pending TiE admin countersignature.');
+      ? 'Verdict submitted: NOT YET.\n\nThe founder now sees the gap list and their free re-review.\n\n(Round '+st.rounds_done+')'
+      : 'Recommendation submitted: AWARD MARK.\n\nThis now goes to TiE for countersignature. The founder is NOT told and the mark is NOT live until an admin countersigns.');
+    go('reviewer-dashboard');
   }catch(e){ alert('Could not save the verdict — is the local server running?'); }
 }
 
@@ -4720,6 +4773,7 @@ function go(name){
   if(name==='profile' && typeof loadFounderDeals==='function') loadFounderDeals();
   if(name==='investor-account' && typeof loadInvestorDeals==='function') loadInvestorDeals();
   if(name==='impact' && typeof loadImpact==='function') loadImpact();
+  if(name==='reviewer-dashboard' && typeof loadReviewerQueue==='function') loadReviewerQueue();
   if(name==='resubmit' && typeof populateResubmit==='function') populateResubmit();
   if((name==='terms'||name==='privacy') && typeof populateLegal==='function') populateLegal(name);
   // Toggle nav auth state: Login/Sign up on home only, My Profile everywhere else
@@ -5729,6 +5783,136 @@ function _impactTile(value, label){
   return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center;">'+
     '<div style="font-size:30px;font-weight:800;color:var(--dark);">'+value+'</div>'+
     '<div style="font-size:12px;color:var(--grey);margin-top:3px;">'+_escapeHtml(label)+'</div></div>';
+}
+
+// ---- Admin: countersign real reviewer recommendations --------------------
+async function loadPendingVerdicts(){
+  var el=document.getElementById('admin-verdicts-live'); if(!el) return;
+  if(!window.__adminCred){
+    el.innerHTML='<div style="font-size:12px;color:var(--mid);">Sign in with a Google admin account to see recommendations awaiting countersign.</div>';
+    return;
+  }
+  el.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading…</p>';
+  try{
+    var r=await fetch('/api/admin/pending-verdicts',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred})});
+    var out=await r.json();
+    if(out.error){ el.innerHTML='<div style="font-size:12px;color:var(--red);">'+_escapeHtml(out.error)+'</div>'; return; }
+    _renderPendingVerdicts(out.pending||[]);
+  }catch(e){ el.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+function _renderPendingVerdicts(rows){
+  var el=document.getElementById('admin-verdicts-live'); if(!el) return;
+  if(!rows.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--mid);">Nothing awaiting countersign. When a reviewer recommends the mark, it appears here for your final sign-off.</div>';
+    return;
+  }
+  var html='<table class="admin-table"><thead><tr><th>Founder</th><th>Startup</th><th>Reviewer</th><th>Round</th><th>Reviewer note</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(function(p){
+    html+='<tr><td><strong>'+_escapeHtml(p.name||'—')+'</strong></td>'+
+      '<td>'+_escapeHtml(p.company||'—')+'</td>'+
+      '<td>'+_escapeHtml(p.reviewer||'—')+'</td>'+
+      '<td>'+_escapeHtml(String(p.round||''))+'</td>'+
+      '<td style="max-width:260px;font-size:12px;color:var(--dark);">'+_escapeHtml(p.note||'')+'</td>'+
+      '<td class="action-btns"><button class="btn-xs btn-xs-green" onclick="countersign('+p.review_id+',\'issue\',this)">Countersign &amp; Issue</button>'+
+      '<button class="btn-xs btn-xs-outline" onclick="countersign('+p.review_id+',\'override\',this)">Override</button></td></tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+async function countersign(reviewId, decision, btn){
+  if(!window.__adminCred){ alert('Sign in with a Google admin account first.'); return; }
+  var note='';
+  if(decision==='override'){
+    note=prompt('Reason for withholding the mark (the founder sees a short version):')||'';
+  }else{
+    if(!confirm('Countersign and issue the VentureReady mark?\n\nThis makes the mark live and routes the founder to screened investors.')) return;
+  }
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    var r=await fetch('/api/review/countersign',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({credential:window.__adminCred, review_id:reviewId, decision:decision, note:note})});
+    var out=await r.json();
+    if(out.error){ alert(out.error); if(btn){ btn.disabled=false; } return; }
+    _renderPendingVerdicts(out.pending||[]);
+  }catch(e){ alert('Could not reach the server. Please try again.'); if(btn){ btn.disabled=false; } }
+}
+
+// ---- Reviewer (TiE Charter Member) sign-in + real assigned queue ----------
+function _rvErr(msg){ var e=document.getElementById('rv-error'); if(e){ e.style.display=msg?'':'none'; e.textContent=msg||''; } }
+async function reviewerLogin(){
+  function v(id){ var el=document.getElementById(id); return el?(el.value||'').trim():''; }
+  var email=v('rv-email'), pw=v('rv-password');
+  _rvErr('');
+  if(!email||!pw){ _rvErr('Please enter your email and password.'); return; }
+  try{
+    var r=await fetch('/api/reviewer/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,password:pw})});
+    var out=await r.json();
+    if(out.error){ _rvErr(out.error); return; }
+    _applyReviewer(out.reviewer);
+  }catch(e){ _rvErr('Could not reach the server. Please try again.'); return; }
+  loggedInAs='reviewer'; go('reviewer-dashboard');
+}
+async function reviewerSignup(){
+  function v(id){ var el=document.getElementById(id); return el?(el.value||'').trim():''; }
+  var email=v('rv-email'), pw=v('rv-password');
+  _rvErr('');
+  if(!email||!pw){ _rvErr('Enter the email TiE assigns your reviews to, and a password to create your account.'); return; }
+  try{
+    var r=await fetch('/api/reviewer/signup',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,password:pw,name:''})});
+    var out=await r.json();
+    if(out.error){ _rvErr(out.error); return; }
+    _applyReviewer(out.reviewer);
+  }catch(e){ _rvErr('Could not reach the server. Please try again.'); return; }
+  loggedInAs='reviewer'; go('reviewer-dashboard');
+}
+function _applyReviewer(rec){
+  if(!rec) return;
+  window._reviewerEmail=rec.email||''; window._reviewerName=rec.name||'';
+}
+async function loadReviewerQueue(){
+  var el=document.getElementById('reviewer-queue-live'); if(!el) return;
+  if(!window._reviewerEmail){
+    el.innerHTML='<div style="font-size:12px;color:var(--mid);">Sign in as a reviewer to see the decks TiE has assigned you.</div>';
+    return;
+  }
+  el.innerHTML='<p style="font-size:12px;color:var(--grey);">Loading…</p>';
+  try{
+    var r=await fetch('/api/reviewer/queue?email='+encodeURIComponent(window._reviewerEmail));
+    var out=await r.json();
+    _renderReviewerQueue(out.queue||[]);
+  }catch(e){ el.innerHTML='<div style="font-size:12px;color:var(--red);">Could not reach the server. Please try again.</div>'; }
+}
+var RV_STATUS={ not_started:['Not started','var(--red)'], not_yet:['Feedback given','#B45309'],
+  recommended:['Awaiting countersign','#7C3AED'], mark_issued:['Mark issued','var(--green)'],
+  overridden:['Sent back','#B45309'] };
+function _renderReviewerQueue(rows){
+  var el=document.getElementById('reviewer-queue-live'); if(!el) return;
+  if(!rows.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--mid);">No decks assigned to you yet. When TiE assigns you a founder, it appears here.</div>';
+    return;
+  }
+  var html='<table class="admin-table"><thead><tr><th>Founder</th><th>Startup · Sector · Stage</th><th>Assigned</th><th>SLA</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(function(q){
+    var st=RV_STATUS[q.review_status]||['—','var(--grey)'];
+    var done=(q.review_status!=='not_started');
+    html+='<tr><td><strong>'+_escapeHtml(q.name||'—')+'</strong></td>'+
+      '<td>'+_escapeHtml((q.company||'')+' · '+(q.sector||'')+' · '+(q.stage||''))+'</td>'+
+      '<td>'+_escapeHtml((q.assigned_at||'').split(' ')[0])+'</td>'+
+      '<td>'+_escapeHtml((q.sla_due||'').split(' ')[0])+'</td>'+
+      '<td><span style="font-size:11px;font-weight:700;color:'+st[1]+';">'+st[0]+'</span></td>'+
+      '<td class="action-btns"><button class="btn-xs '+(done?'btn-xs-outline':'btn-xs-red')+'" onclick="openReviewFor('+q.founder_id+',this)">'+(done?'Re-open':'Review Now')+'</button></td></tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+function openReviewFor(founderId, btn){
+  window._reviewFounderId=founderId;
+  var name=''; try{ name=btn.closest('tr').querySelector('td strong').textContent; }catch(e){}
+  window._reviewFounderName=name;
+  go('reviewer-review');
 }
 
 // Founder demo fallback used only when NO Google Client ID is configured.

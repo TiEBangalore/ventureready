@@ -141,6 +141,19 @@ function db_init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
       startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
       status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)`);
+  // Reviewers (TiE Charter Members). Same auth shape as founders: password OR
+  // Google. TiE controls who reviews by assigning decks to a reviewer's email.
+  db.exec(`CREATE TABLE IF NOT EXISTS reviewer(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE,
+      password_hash TEXT, password_salt TEXT, google_sub TEXT, created_at TEXT)`);
+  // Review lifecycle: an AWARD is only a recommendation until an admin
+  // countersigns it. Migrate older review rows (no status) to 'issued'.
+  {
+    const rcols = db.prepare("PRAGMA table_info(review)").all().map((r) => r.name);
+    if (!rcols.includes("status")) db.exec("ALTER TABLE review ADD COLUMN status TEXT DEFAULT 'issued'");
+    if (!rcols.includes("countersigned_by")) db.exec("ALTER TABLE review ADD COLUMN countersigned_by TEXT");
+    if (!rcols.includes("countersigned_at")) db.exec("ALTER TABLE review ADD COLUMN countersigned_at TEXT");
+  }
   // Deals: one founder<->investor relationship tracked from introduction to
   // outcome. This is the substrate for TiE's impact reporting. stage walks:
   // 'introduced' -> 'met' -> 'diligence' -> 'term_sheet' -> 'closed' | 'passed'.
@@ -339,25 +352,22 @@ const FREE_REREVIEW_ROUND = 2; // round 1 = paid review, round 2 = the single fr
 const REREVIEW_FEE = "₹3,000 + GST";
 
 function review_add(founder_id, verdict, gaps, reviewer, note) {
-  // Record a reviewer's verdict as the next round for this founder.
+  // An AWARD is only a RECOMMENDATION ('recommended') until an admin countersigns
+  // it — the founder is not told and the mark is not live yet. A 'not yet' is
+  // coaching, so it is 'issued' straight away and the founder sees the feedback.
+  const status = verdict === "awarded" ? "recommended" : "issued";
   const last = db.prepare("SELECT MAX(round) m FROM review WHERE founder_id=?").get(founder_id);
   const rnd = (last.m || 0) + 1;
-  db.prepare("INSERT INTO review(founder_id,round,verdict,gaps_json,reviewer,note,created_at) " +
-    "VALUES(?,?,?,?,?,?,datetime('now'))").run(
-    founder_id, rnd, verdict, JSON.stringify(gaps || []), reviewer || "TiE Reviewer", note || "");
+  db.prepare("INSERT INTO review(founder_id,round,verdict,gaps_json,reviewer,note,status,created_at) " +
+    "VALUES(?,?,?,?,?,?,?,datetime('now'))").run(
+    founder_id, rnd, verdict, JSON.stringify(gaps || []), reviewer || "TiE Reviewer", note || "", status);
   const fb = _founder_brief(founder_id);
   if (verdict === "awarded") {
-    if (fb.email) {
-      notify("mark_awarded", [fb.email],
-        "You have earned the VentureReady mark",
-        "Congratulations " + (fb.name || "") +
-        " — your venture has been awarded the VentureReady mark. Screened investors can now discover your profile.",
-        "high");
-    }
-    notify("mark_awarded_admin", ["admins"],
-      "VentureReady mark awarded",
-      "The VentureReady mark was awarded to " +
-      (fb.name || ("founder #" + founder_id)) + ".", "normal");
+    notify("verdict_pending_countersign", ["admins"],
+      "Verdict to countersign: " + (fb.name || ("founder #" + founder_id)),
+      (reviewer || "A reviewer") + " recommends awarding the VentureReady mark to " +
+      (fb.name || ("founder #" + founder_id)) +
+      ". Countersign in the Team Portal to issue it.", "high");
   } else {
     if (fb.email) {
       notify("review_feedback", [fb.email],
@@ -373,15 +383,27 @@ function review_add(founder_id, verdict, gaps, reviewer, note) {
   return review_state(founder_id);
 }
 
+function _founder_visible_verdict(row) {
+  // What the FOUNDER sees, honouring the countersign gate: a recommended award
+  // reads as 'in_review'; an overridden award reads as 'not_yet' (withheld).
+  if (!row) return null;
+  const v = row.verdict, st = row.status || "issued";
+  if (v === "awarded" && st === "recommended") return "in_review";
+  if (v === "awarded" && st === "overridden") return "not_yet";
+  return v;
+}
+
 function review_state(founder_id) {
-  // Everything the founder's screens need: history, latest verdict, and whether
-  // the next re-review is the free one or has to be paid for.
+  // Everything the founder's screens need. Awards that haven't been countersigned
+  // are shown as 'in_review', never as the live mark.
   const rows = db.prepare(
-    "SELECT round,verdict,gaps_json,reviewer,note,created_at FROM review " +
+    "SELECT round,verdict,gaps_json,reviewer,note,status,created_at FROM review " +
     "WHERE founder_id=? ORDER BY round").all(founder_id);
   for (const r of rows) {
     r.gaps = JSON.parse(r.gaps_json || "[]");
     delete r.gaps_json;
+    r.raw_verdict = r.verdict;
+    r.verdict = _founder_visible_verdict(r);
   }
   const latest = rows.length ? rows[rows.length - 1] : null;
   const rounds_done = rows.length;
@@ -391,12 +413,176 @@ function review_state(founder_id) {
     latest: latest,
     rounds_done: rounds_done,
     next_round: next_round,
-    // The single free re-review is round 2 and only if they haven't already earned the mark.
     free_rereview_available: (next_round === FREE_REREVIEW_ROUND &&
       Boolean(latest) && latest.verdict === "not_yet"),
     free_rereview_used: rounds_done >= FREE_REREVIEW_ROUND,
     rereview_fee: REREVIEW_FEE,
   };
+}
+
+// ---- Reviewers (accounts, queue, gated verdict submission) -----------------
+function _public_reviewer(row) {
+  if (!row) return null;
+  const out = { ...row };
+  delete out.password_hash; delete out.password_salt;
+  return out;
+}
+
+function reviewer_signup(d) {
+  const email = (d.email || "").trim().toLowerCase();
+  const password = d.password || "";
+  if (!email || !password) return { error: "Email and password are required." };
+  const existing = db.prepare("SELECT * FROM reviewer WHERE email=?").get(email);
+  if (existing && existing.password_hash) {
+    return { error: "That email is already registered. Please log in instead." };
+  }
+  const [pw_hash, pw_salt] = hash_pw(password);
+  let rid;
+  if (existing) {
+    db.prepare("UPDATE reviewer SET name=?, password_hash=?, password_salt=? WHERE id=?")
+      .run(d.name || "", pw_hash, pw_salt, existing.id);
+    rid = existing.id;
+  } else {
+    const cur = db.prepare("INSERT INTO reviewer(name,email,password_hash,password_salt,created_at) " +
+      "VALUES(?,?,?,?,datetime('now'))").run(d.name || "", email, pw_hash, pw_salt);
+    rid = cur.lastInsertRowid;
+  }
+  return { reviewer: _public_reviewer(db.prepare("SELECT * FROM reviewer WHERE id=?").get(rid)) };
+}
+
+function reviewer_login(email, password) {
+  email = (email || "").trim().toLowerCase();
+  const row = db.prepare("SELECT * FROM reviewer WHERE email=?").get(email);
+  if (!row || !row.password_hash || !row.password_salt) {
+    return { error: "No reviewer account found for that email, or it has no password set." };
+  }
+  const [calc] = hash_pw(password, row.password_salt);
+  if (!timing_safe_equal(calc, row.password_hash)) {
+    return { error: "Incorrect email or password." };
+  }
+  return { reviewer: _public_reviewer(row) };
+}
+
+async function reviewer_google_login(idToken) {
+  const v = await verify_google_token(idToken);
+  if (v.error) return { error: v.error };
+  const sub = v.sub, email = (v.email || "").trim().toLowerCase(), name = v.name;
+  let row = db.prepare("SELECT * FROM reviewer WHERE google_sub=?").get(sub);
+  if (!row && email) row = db.prepare("SELECT * FROM reviewer WHERE email=?").get(email);
+  let rid;
+  if (row) {
+    db.prepare("UPDATE reviewer SET google_sub=?, name=COALESCE(NULLIF(name,''), ?) WHERE id=?")
+      .run(sub, name || "", row.id);
+    rid = row.id;
+  } else {
+    const cur = db.prepare("INSERT INTO reviewer(name,email,google_sub,created_at) " +
+      "VALUES(?,?,?,datetime('now'))").run(name || "TiE Reviewer", email, sub);
+    rid = cur.lastInsertRowid;
+  }
+  return { reviewer: _public_reviewer(db.prepare("SELECT * FROM reviewer WHERE id=?").get(rid)) };
+}
+
+function reviewer_queue(email) {
+  email = (email || "").trim().toLowerCase();
+  if (!email) return [];
+  const rows = db.prepare(
+    "SELECT a.founder_id, a.created_at AS assigned_at, a.sla_due, a.status AS assign_status " +
+    "FROM review_assignment a " +
+    "WHERE a.reviewer_email=? AND a.id IN " +
+    "  (SELECT MAX(id) FROM review_assignment WHERE reviewer_email=? GROUP BY founder_id) " +
+    "ORDER BY a.id DESC").all(email, email);
+  return rows.map((a) => {
+    const fb = _founder_brief(a.founder_id);
+    const f = db.prepare("SELECT stage, sector FROM founder WHERE id=?").get(a.founder_id);
+    const rv = db.prepare("SELECT verdict, status FROM review WHERE founder_id=? ORDER BY round DESC LIMIT 1")
+      .get(a.founder_id);
+    let review_status = "not_started";
+    if (rv) {
+      if (rv.verdict === "awarded" && rv.status === "recommended") review_status = "recommended";
+      else if (rv.verdict === "awarded" && rv.status === "issued") review_status = "mark_issued";
+      else if (rv.verdict === "awarded" && rv.status === "overridden") review_status = "overridden";
+      else review_status = "not_yet";
+    }
+    return {
+      founder_id: a.founder_id, name: fb.name || "", company: fb.company || "",
+      stage: (f && f.stage) || "", sector: (f && f.sector) || "",
+      assigned_at: a.assigned_at || "", sla_due: a.sla_due || "", review_status: review_status,
+    };
+  });
+}
+
+function reviewer_submit(reviewer_email, founder_id, verdict, gaps, note) {
+  reviewer_email = (reviewer_email || "").trim().toLowerCase();
+  if (!["not_yet", "awarded"].includes(verdict)) {
+    return { error: "verdict must be 'not_yet' or 'awarded'.", status: 400 };
+  }
+  const a = db.prepare("SELECT * FROM review_assignment WHERE founder_id=? AND reviewer_email=? " +
+    "ORDER BY id DESC LIMIT 1").get(founder_id, reviewer_email);
+  if (!a) {
+    return { error: "This founder isn't assigned to you. Ask TiE to assign it first.", status: 403 };
+  }
+  db.prepare("UPDATE review_assignment SET status='reviewed' WHERE id=?").run(a.id);
+  return review_add(founder_id, verdict, gaps, a.reviewer_name || reviewer_email, note);
+}
+
+async function pending_verdicts(idToken) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  const rows = db.prepare(
+    "SELECT id, founder_id, round, gaps_json, reviewer, note, created_at " +
+    "FROM review WHERE verdict='awarded' AND status='recommended' ORDER BY id DESC").all();
+  const out = rows.map((r) => {
+    const fb = _founder_brief(r.founder_id);
+    return {
+      review_id: r.id, founder_id: r.founder_id, name: fb.name || "", company: fb.company || "",
+      round: r.round, reviewer: r.reviewer || "", note: r.note || "",
+      gaps: JSON.parse(r.gaps_json || "[]"), created_at: r.created_at || "",
+    };
+  });
+  return { pending: out };
+}
+
+async function review_countersign(idToken, review_id, decision, note) {
+  const g = await require_admin(idToken);
+  if (g.error) return g;
+  if (!["issue", "override"].includes(decision)) {
+    return { error: "decision must be 'issue' or 'override'.", status: 400 };
+  }
+  const row = db.prepare("SELECT * FROM review WHERE id=? AND verdict='awarded' AND status='recommended'")
+    .get(review_id);
+  if (!row) return { error: "No pending recommendation found for that review.", status: 404 };
+  const fid = row.founder_id;
+  const new_status = decision === "issue" ? "issued" : "overridden";
+  db.prepare("UPDATE review SET status=?, countersigned_by=?, countersigned_at=datetime('now') WHERE id=?")
+    .run(new_status, g.email, review_id);
+  const fb = _founder_brief(fid);
+  if (decision === "issue") {
+    if (fb.email) {
+      notify("mark_awarded", [fb.email],
+        "You have earned the VentureReady mark",
+        "Congratulations " + (fb.name || "") +
+        " — TiE has countersigned your review and awarded the VentureReady mark. " +
+        "Screened investors can now discover your profile.", "high");
+    }
+    notify("mark_awarded_admin", ["admins"],
+      "VentureReady mark issued",
+      g.email + " countersigned and issued the mark to " +
+      (fb.name || ("founder #" + fid)) + ".", "normal");
+  } else {
+    if (fb.email) {
+      notify("mark_withheld", [fb.email],
+        "An update on your VentureReady review",
+        "After TiE's final review, the mark is being held for now" +
+        (note ? " — note: " + note : "") +
+        ". Please see your feedback for what to strengthen before the next round.", "normal");
+    }
+    notify("mark_withheld_admin", ["admins"],
+      "Mark recommendation overridden",
+      g.email + " overrode the recommended mark for " +
+      (fb.name || ("founder #" + fid)) + ".", "normal");
+  }
+  const listed = await pending_verdicts(idToken);
+  return { ok: true, pending: listed.pending || [] };
 }
 
 // ---- Data room (diligence documents) ----
@@ -1713,6 +1899,10 @@ async function handleGet(req, res, urlObj) {
     const iem = urlObj.searchParams.get("investor_email") || "";
     return sendJson(res, 200, { deals: deals_for(fid || null, iem || null) });
   }
+  if (p === "/api/reviewer/queue") {
+    const em = urlObj.searchParams.get("email") || "";
+    return sendJson(res, 200, { queue: reviewer_queue(em) });
+  }
   if (p === "/api/impact") {
     return sendJson(res, 200, impact_public());
   }
@@ -1884,6 +2074,28 @@ async function handlePost(req, res, urlObj, data) {
     }
     result.deck_id = deck_id;
     return sendJson(res, 200, result);
+  } else if (p === "/api/reviewer/signup") {
+    const out = reviewer_signup(data);
+    return sendJson(res, out.error ? 400 : 200, out);
+  } else if (p === "/api/reviewer/login") {
+    const out = reviewer_login(data.email || "", data.password || "");
+    return sendJson(res, out.error ? 401 : 200, out);
+  } else if (p === "/api/reviewer/auth/google") {
+    const out = await reviewer_google_login(data.credential || "");
+    return sendJson(res, out.error ? 401 : 200, out);
+  } else if (p === "/api/reviewer/submit") {
+    const out = reviewer_submit(data.reviewer_email || "", data.founder_id, data.verdict || "",
+      data.gaps, data.note || "");
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/admin/pending-verdicts") {
+    const out = await pending_verdicts(data.credential || "");
+    if (out.error) return sendJson(res, out.status || 403, { error: out.error });
+    return sendJson(res, 200, out);
+  } else if (p === "/api/review/countersign") {
+    const out = await review_countersign(data.credential || "", data.review_id,
+      data.decision || "", data.note || "");
+    if (out.error) return sendJson(res, out.status || 400, { error: out.error });
+    return sendJson(res, 200, out);
   } else if (p === "/api/deal/create") {
     const out = deal_create(data);
     return sendJson(res, out.error ? (out.status || 400) : 200, out);
