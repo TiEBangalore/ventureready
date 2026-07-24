@@ -31,6 +31,33 @@ Then open **http://localhost:8000** in a browser.
 On macOS you can also just double-click **`Start VentureReady.command`** — it
 runs `npm install` automatically the first time.
 
+## Deploying to Render
+
+The Node server (`server.js`) is host-ready: it binds to `PORT`/`0.0.0.0` and
+reads config from **environment variables** (which override the local `.env`).
+A [`render.yaml`](render.yaml) blueprint is included.
+
+1. In Render: **New → Blueprint**, connect this (private) repo. It reads
+   `render.yaml` and pre-fills build (`npm install`) and start (`npm start`).
+2. Set each config value in the Render dashboard (the same keys as `.env`;
+   they're marked `sync: false` so they're never committed). Do **not** upload
+   `.env`.
+3. Add your live URL (e.g. `https://ventureready.onrender.com`) as an
+   **Authorized JavaScript origin** on the Google OAuth client, or Google
+   sign-in will fall back to demo.
+
+**Data persistence — important.** Render's **free** plan uses an ephemeral
+disk, so `data.db` and uploaded `decks/` + `dataroom/` files are **wiped on
+every redeploy/restart**. That's fine for previewing and wiring integrations,
+but **before real founders/investors use it**:
+
+- change `plan: free` to a paid plan, **and**
+- attach a **Persistent Disk** (uncomment the `disk:` block in `render.yaml`,
+  e.g. mount at `/var/data`) and set `DATA_DIR` to that mount path.
+
+`DATA_DIR` tells the app where to keep the database and uploads; it defaults to
+the app folder locally.
+
 ## Configuration (`.env`)
 
 Copy `.env.example` to `.env` and fill in the values. The real `.env` is

@@ -1,0 +1,61 @@
+# Render Blueprint for VentureReady (Node service — deploys server.js).
+# In Render: New → Blueprint → connect this repo. Then set each secret value
+# in the dashboard (they are sync:false, so they are NOT read from this file).
+#
+# IMPORTANT — data persistence:
+#   The FREE plan has an ephemeral disk: data.db and uploaded decks/dataroom
+#   files are WIPED on every redeploy/restart. That is fine to preview the app
+#   and wire integrations, but BEFORE onboarding real users you must:
+#     1. change `plan: free` to `plan: starter` (paid), and
+#     2. add a Disk (below) and set DATA_DIR to its mount path.
+#   A persistent disk requires a paid instance.
+
+services:
+  - type: web
+    name: ventureready
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    # --- Uncomment to keep data across deploys (needs a paid plan) ---
+    # disk:
+    #   name: ventureready-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    envVars:
+      # Uncomment DATA_DIR only after attaching the disk above.
+      # - key: DATA_DIR
+      #   value: /var/data
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ZOHO_CLIENT_ID
+        sync: false
+      - key: ZOHO_CLIENT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false
+      - key: TIE_MEMBERSHIP_URL
+        sync: false
+      - key: EXPERT_REVIEW_PAYMENT_URL
+        sync: false
+      - key: ADMIN_SUPER_EMAILS
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      # --- Email (Stage 3); leave unset to stay record-only ---
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        sync: false

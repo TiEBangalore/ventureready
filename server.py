@@ -11,8 +11,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# Where the database and uploaded files live. Defaults to the app folder; set
+# DATA_DIR to a mounted persistent disk on a host so data survives redeploys.
+DATA_DIR = os.environ.get("DATA_DIR") or HERE
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+except Exception:
+    pass
+
 # ---- Local database (SQLite). Proves real persistence: data survives refresh AND restart. ----
-DB_PATH = os.path.join(HERE, "data.db")
+DB_PATH = os.path.join(DATA_DIR, "data.db")
 def _db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -196,7 +204,7 @@ def support_list():
     return {"support": rows}
 
 # ---- Founders (real per-user records) ----
-DECKS_DIR = os.path.join(HERE, "decks")
+DECKS_DIR = os.path.join(DATA_DIR, "decks")
 
 # --- Password handling (PROTOTYPE-GRADE, not production security) ---
 # Passwords are never stored or logged in plaintext. Each founder gets a random
@@ -607,7 +615,7 @@ def review_countersign(id_token, review_id, decision, note):
     return {"ok": True, "pending": pending_verdicts(id_token).get("pending", [])}
 
 # ---- Data room (diligence documents) ----
-DATAROOM_DIR = os.path.join(HERE, "dataroom")
+DATAROOM_DIR = os.path.join(DATA_DIR, "dataroom")
 
 def dataroom_add(founder_id, item_key, filename, raw):
     """Save a diligence document and point the checklist item at it.
@@ -681,7 +689,10 @@ try:
             k, v = line.split("=", 1)
             ENV[k.strip()] = v.strip()
 except FileNotFoundError:
-    print("WARNING: .env not found — Zoho check will not work.")
+    print("Note: no .env file — reading config from environment variables instead.")
+# Real environment variables (e.g. a host's dashboard settings) take precedence
+# over the .env file, so the same code works locally and when deployed.
+ENV.update({k: v for k, v in os.environ.items()})
 
 ZOHO_CLIENT_ID = ENV.get("ZOHO_CLIENT_ID", "")
 ZOHO_CLIENT_SECRET = ENV.get("ZOHO_CLIENT_SECRET", "")

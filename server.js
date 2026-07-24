@@ -19,8 +19,14 @@ const Database = require("better-sqlite3");
 
 const HERE = __dirname;
 
+// Where the database and uploaded files live. Defaults to the app folder for
+// local dev; on a host like Render set DATA_DIR to a mounted persistent disk
+// (e.g. /var/data) so data.db, decks/ and dataroom/ survive redeploys.
+const DATA_DIR = process.env.DATA_DIR || HERE;
+try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+
 // ---- Local database (SQLite). Proves real persistence: data survives refresh AND restart. ----
-const DB_PATH = path.join(HERE, "data.db");
+const DB_PATH = path.join(DATA_DIR, "data.db");
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
 
@@ -215,7 +221,7 @@ function support_list() {
 }
 
 // ---- Founders (real per-user records) ----
-const DECKS_DIR = path.join(HERE, "decks");
+const DECKS_DIR = path.join(DATA_DIR, "decks");
 
 // --- Password handling (PROTOTYPE-GRADE, not production security) ---
 // Passwords are never stored or logged in plaintext. Each founder gets a random
@@ -593,7 +599,7 @@ async function review_countersign(idToken, review_id, decision, note) {
 }
 
 // ---- Data room (diligence documents) ----
-const DATAROOM_DIR = path.join(HERE, "dataroom");
+const DATAROOM_DIR = path.join(DATA_DIR, "dataroom");
 
 function dataroom_add(founder_id, item_key, filename, raw) {
   // Save a diligence document and point the checklist item at it.
@@ -660,8 +666,11 @@ try {
     }
   }
 } catch (e) {
-  console.log("WARNING: .env not found — Zoho check will not work.");
+  console.log("Note: no .env file — reading config from environment variables instead.");
 }
+// Real environment variables (e.g. Render's dashboard settings) take precedence
+// over the .env file, so the same code works locally and on a host.
+Object.assign(ENV, process.env);
 
 const ZOHO_CLIENT_ID = ENV.ZOHO_CLIENT_ID || "";
 const ZOHO_CLIENT_SECRET = ENV.ZOHO_CLIENT_SECRET || "";
