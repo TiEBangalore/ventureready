@@ -1937,9 +1937,10 @@ ANTI_PATTERNS = (
 )
 
 # ---- Model auto-discovery ----
-# Nobody has to know or maintain the AI model name. The app asks Anthropic which
-# models the account can use and picks the strongest one, preferring Opus, then
-# Sonnet. A manual override (ANTHROPIC_MODEL in .env) wins if ever needed.
+# The diagnostic runs on SONNET by default — best value for a positioning read.
+# Opus is NOT chosen automatically; to use it, set ANTHROPIC_MODEL to an Opus
+# model id (that override always wins). The app discovers the latest Sonnet the
+# account can use so the exact version name is never hand-maintained.
 _model_cache = {"value": None}
 
 def get_model():
@@ -1947,9 +1948,10 @@ def get_model():
         return _model_cache["value"]
     override = ENV.get("ANTHROPIC_MODEL", "").strip()
     if override:
+        # Explicit choice (e.g. an Opus id) always wins.
         _model_cache["value"] = override
         return override
-    fallback = "claude-sonnet-4-5"  # safe default if discovery ever fails
+    fallback = "claude-sonnet-4-5"  # safe Sonnet default if discovery ever fails
     try:
         req = urllib.request.Request(
             "https://api.anthropic.com/v1/models?limit=100", method="GET",
@@ -1957,16 +1959,14 @@ def get_model():
         )
         data = json.loads(urllib.request.urlopen(req, timeout=20).read()).get("data", [])
         ids = [m["id"] for m in data if "id" in m]
-        # API returns newest first; keep that order and prefer Sonnet (best value for
-        # this diagnostic), then fall back to Opus, then whatever's newest.
-        chosen = (next((i for i in ids if "sonnet" in i), None)
-                  or next((i for i in ids if "opus" in i), None)
-                  or (ids[0] if ids else fallback))
+        # Only ever pick a Sonnet automatically — never Opus. Opus is opt-in via
+        # ANTHROPIC_MODEL above. If no Sonnet is listed, use the Sonnet fallback.
+        chosen = next((i for i in ids if "sonnet" in i), None) or fallback
         _model_cache["value"] = chosen
-        print("AI model auto-selected:", chosen)
+        print("AI model auto-selected (Sonnet by default):", chosen)
         return chosen
     except Exception as e:
-        print("model discovery failed (%s) — using fallback %s" % (e, fallback))
+        print("model discovery failed (%s) — using Sonnet fallback %s" % (e, fallback))
         _model_cache["value"] = fallback
         return fallback
 

@@ -1818,19 +1818,21 @@ const ANTI_PATTERNS =
   "contradictions, projection overconfidence, regulatory blindspots, and US-playbook assumptions in the Indian market";
 
 // ---- Model auto-discovery ----
-// Nobody has to know or maintain the AI model name. The app asks Anthropic which
-// models the account can use and picks the strongest one, preferring Sonnet, then
-// Opus. A manual override (ANTHROPIC_MODEL in .env) wins if ever needed.
+// The diagnostic runs on SONNET by default — best value for a positioning read.
+// Opus is NOT chosen automatically; to use it, set ANTHROPIC_MODEL to an Opus
+// model id (that override always wins). The app discovers the latest Sonnet the
+// account can use so the exact version name is never hand-maintained.
 const _model_cache = { value: null };
 
 async function get_model() {
   if (_model_cache.value) return _model_cache.value;
   const override = (ENV.ANTHROPIC_MODEL || "").trim();
   if (override) {
+    // Explicit choice (e.g. an Opus id) always wins.
     _model_cache.value = override;
     return override;
   }
-  const fallback = "claude-sonnet-4-5"; // safe default if discovery ever fails
+  const fallback = "claude-sonnet-4-5"; // safe Sonnet default if discovery ever fails
   try {
     const resp = await fetch("https://api.anthropic.com/v1/models?limit=100", {
       method: "GET",
@@ -1838,16 +1840,14 @@ async function get_model() {
     });
     const data = (await resp.json()).data || [];
     const ids = data.filter((m) => m.id).map((m) => m.id);
-    // API returns newest first; keep that order and prefer Sonnet (best value for
-    // this diagnostic), then fall back to Opus, then whatever's newest.
-    const chosen = ids.find((i) => i.includes("sonnet")) ||
-      ids.find((i) => i.includes("opus")) ||
-      (ids.length ? ids[0] : fallback);
+    // Only ever pick a Sonnet automatically — never Opus. Opus is opt-in via
+    // ANTHROPIC_MODEL above. If no Sonnet is listed, use the Sonnet fallback.
+    const chosen = ids.find((i) => i.includes("sonnet")) || fallback;
     _model_cache.value = chosen;
-    console.log("AI model auto-selected:", chosen);
+    console.log("AI model auto-selected (Sonnet by default):", chosen);
     return chosen;
   } catch (e) {
-    console.log(`model discovery failed (${e.message}) — using fallback ${fallback}`);
+    console.log(`model discovery failed (${e.message}) — using Sonnet fallback ${fallback}`);
     _model_cache.value = fallback;
     return fallback;
   }
