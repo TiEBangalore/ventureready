@@ -495,6 +495,32 @@ async function reviewer_google_login(idToken) {
   return { reviewer: _public_reviewer(db.prepare("SELECT * FROM reviewer WHERE id=?").get(rid)) };
 }
 
+const DEMO_REVIEWER_EMAIL = "demo.reviewer@tiebangalore.org";
+const DEMO_FOUNDER_EMAIL = "demo.founder@tiebangalore.org";
+
+function reviewer_demo() {
+  // One-click demo: a demo reviewer with a demo founder already assigned, so the
+  // full expert-review flow can be explored. Idempotent — reuses demo records.
+  if (!db.prepare("SELECT 1 FROM reviewer WHERE email=?").get(DEMO_REVIEWER_EMAIL)) {
+    db.prepare("INSERT INTO reviewer(name, email, created_at) VALUES('Demo Reviewer', ?, datetime('now'))")
+      .run(DEMO_REVIEWER_EMAIL);
+  }
+  let f = db.prepare("SELECT * FROM founder WHERE email=?").get(DEMO_FOUNDER_EMAIL);
+  if (!f) {
+    db.prepare("INSERT INTO founder(name, email, company, stage, sector, created_at) " +
+      "VALUES('Demo Founder', ?, 'Demo Labs', 'Seed', 'B2B SaaS', datetime('now'))").run(DEMO_FOUNDER_EMAIL);
+    f = db.prepare("SELECT * FROM founder WHERE email=?").get(DEMO_FOUNDER_EMAIL);
+  }
+  if (!db.prepare("SELECT 1 FROM review_assignment WHERE founder_id=? AND reviewer_email=?")
+        .get(f.id, DEMO_REVIEWER_EMAIL)) {
+    db.prepare("INSERT INTO review_assignment(founder_id, founder_name, reviewer_email, reviewer_name, " +
+      "assigned_by, status, sla_due, created_at) VALUES(?, 'Demo Founder', ?, 'Demo Reviewer', 'demo', " +
+      "'assigned', date('now','+5 day'), datetime('now'))").run(f.id, DEMO_REVIEWER_EMAIL);
+  }
+  const rev = db.prepare("SELECT * FROM reviewer WHERE email=?").get(DEMO_REVIEWER_EMAIL);
+  return { reviewer: _public_reviewer(rev) };
+}
+
 function reviewer_queue(email) {
   email = (email || "").trim().toLowerCase();
   if (!email) return [];
@@ -654,6 +680,15 @@ function diagnostic_save(founder_id, deck_id, result) {
     result.summary || "", JSON.stringify(result.findings || []));
 }
 
+// How many FRESH (paid) AI reads this founder has run in the last `days` days.
+// A cached re-run of an identical deck is never saved, so it never counts here.
+function diagnostic_run_count(founder_id, days) {
+  const row = db.prepare(
+    "SELECT COUNT(*) AS n FROM diagnostic WHERE founder_id=? " +
+    "AND created_at >= datetime('now', ?)").get(founder_id, "-" + parseInt(days, 10) + " day");
+  return row ? row.n : 0;
+}
+
 // ---- load .env (private config: Zoho keys + optional Anthropic key) ----
 const ENV = {};
 try {
@@ -675,6 +710,14 @@ Object.assign(ENV, process.env);
 const ZOHO_CLIENT_ID = ENV.ZOHO_CLIENT_ID || "";
 const ZOHO_CLIENT_SECRET = ENV.ZOHO_CLIENT_SECRET || "";
 const ANTHROPIC_API_KEY = ENV.ANTHROPIC_API_KEY || "";
+
+// Founder abuse-control: cap how many FRESH (paid) AI diagnostic runs one founder
+// may do in a rolling window. Re-running the IDENTICAL deck is always free (it's
+// served from cache) and never counts. Tune these in .env without touching code;
+// set the cap to 0 to disable the limit entirely.
+const FOUNDER_DIAGNOSTIC_CAP = parseInt(ENV.FOUNDER_DIAGNOSTIC_CAP || "2", 10) || 0;
+const FOUNDER_DIAGNOSTIC_WINDOW_DAYS = parseInt(ENV.FOUNDER_DIAGNOSTIC_WINDOW_DAYS || "30", 10) || 30;
+
 // Google sign-in ("Continue with Google"). This is the PUBLIC OAuth Client ID —
 // it is safe to expose to the browser (that's how Google's button works). There
 // is NO client secret here: the browser gets a signed ID token and the server
@@ -2161,10 +2204,29 @@ async function handlePost(req, res, urlObj, data) {
       });
     }
     let result = null;
+    let capped = false;
     // Reuse a prior read for the same founder + identical deck instead of
     // paying the API again (no double-charging for a re-run).
     if (founder_id && had_file) {
       result = diagnostic_find_reusable(founder_id, fname, raw.length);
+    }
+    // Abuse control: a logged-in founder only gets a limited number of FRESH
+    // paid reads per window. Cached re-runs above never reach here.
+    if (result === null && founder_id && FOUNDER_DIAGNOSTIC_CAP > 0 &&
+        diagnostic_run_count(founder_id, FOUNDER_DIAGNOSTIC_WINDOW_DAYS) >= FOUNDER_DIAGNOSTIC_CAP) {
+      capped = true;
+      result = {
+        live: false,
+        capped: true,
+        summary: (
+          "You've used all " + FOUNDER_DIAGNOSTIC_CAP + " of your free AI positioning reads for this " +
+          FOUNDER_DIAGNOSTIC_WINDOW_DAYS + "-day period. Re-running the exact same deck is always free — " +
+          "this limit only applies to brand-new reads, and it keeps the free diagnostic sustainable for " +
+          "everyone. You can still submit your deck for expert review now, or email " +
+          "admin.blr@tiebangalore.org if you genuinely need another read."
+        ),
+        findings: [],
+      };
     }
     if (result === null) {
       result = await ai_diagnostic(deck_text, data.icp || "", data.pitch || "",
@@ -2181,7 +2243,7 @@ async function handlePost(req, res, urlObj, data) {
     }
     // Long-deck honesty flag: if the deck ran past what we read in full,
     // tell the founder rather than silently analysing only the first part.
-    if (had_file && (deck_text || "").length > DECK_CHAR_LIMIT) {
+    if (!capped && had_file && (deck_text || "").length > DECK_CHAR_LIMIT) {
       result.long_deck = true;
       result.summary = (
         "Heads-up: this deck is longer than we read in full — only the first " +
@@ -2190,6 +2252,14 @@ async function handlePost(req, res, urlObj, data) {
       ) + (result.summary || "");
     }
     result.deck_id = deck_id;
+    // Tell the founder how many fresh reads they have left this window
+    // (only meaningful for a logged-in founder when a cap is in force).
+    if (founder_id && FOUNDER_DIAGNOSTIC_CAP > 0) {
+      const used = diagnostic_run_count(founder_id, FOUNDER_DIAGNOSTIC_WINDOW_DAYS);
+      result.runs_remaining = Math.max(0, FOUNDER_DIAGNOSTIC_CAP - used);
+      result.runs_cap = FOUNDER_DIAGNOSTIC_CAP;
+      result.runs_window_days = FOUNDER_DIAGNOSTIC_WINDOW_DAYS;
+    }
     return sendJson(res, 200, result);
   } else if (p === "/api/reviewer/signup") {
     const out = reviewer_signup(data);
@@ -2200,6 +2270,8 @@ async function handlePost(req, res, urlObj, data) {
   } else if (p === "/api/reviewer/auth/google") {
     const out = await reviewer_google_login(data.credential || "");
     return sendJson(res, out.error ? 401 : 200, out);
+  } else if (p === "/api/reviewer/demo") {
+    return sendJson(res, 200, reviewer_demo());
   } else if (p === "/api/reviewer/submit") {
     const out = reviewer_submit(data.reviewer_email || "", data.founder_id, data.verdict || "",
       data.gaps, data.note || "");

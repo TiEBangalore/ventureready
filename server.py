@@ -489,6 +489,35 @@ def reviewer_google_login(id_token):
     conn.close()
     return {"reviewer": _public_reviewer(row)}
 
+DEMO_REVIEWER_EMAIL = "demo.reviewer@tiebangalore.org"
+DEMO_FOUNDER_EMAIL = "demo.founder@tiebangalore.org"
+
+def reviewer_demo():
+    # One-click demo: signs in as a demo reviewer who already has a demo founder
+    # assigned, so the full expert-review flow (queue -> review -> verdict) can be
+    # explored end to end. Idempotent — reuses the same demo records each time.
+    conn = _db()
+    if not conn.execute("SELECT 1 FROM reviewer WHERE email=?", (DEMO_REVIEWER_EMAIL,)).fetchone():
+        conn.execute("INSERT INTO reviewer(name, email, created_at) "
+                     "VALUES('Demo Reviewer', ?, datetime('now'))", (DEMO_REVIEWER_EMAIL,))
+    f = conn.execute("SELECT * FROM founder WHERE email=?", (DEMO_FOUNDER_EMAIL,)).fetchone()
+    if not f:
+        conn.execute("INSERT INTO founder(name, email, company, stage, sector, created_at) "
+                     "VALUES('Demo Founder', ?, 'Demo Labs', 'Seed', 'B2B SaaS', datetime('now'))",
+                     (DEMO_FOUNDER_EMAIL,))
+        f = conn.execute("SELECT * FROM founder WHERE email=?", (DEMO_FOUNDER_EMAIL,)).fetchone()
+    fid = f["id"]
+    if not conn.execute("SELECT 1 FROM review_assignment WHERE founder_id=? AND reviewer_email=?",
+                        (fid, DEMO_REVIEWER_EMAIL)).fetchone():
+        conn.execute("INSERT INTO review_assignment(founder_id, founder_name, reviewer_email, "
+                     "reviewer_name, assigned_by, status, sla_due, created_at) "
+                     "VALUES(?, 'Demo Founder', ?, 'Demo Reviewer', 'demo', 'assigned', "
+                     "date('now','+5 day'), datetime('now'))", (fid, DEMO_REVIEWER_EMAIL))
+    conn.commit()
+    rev = conn.execute("SELECT * FROM reviewer WHERE email=?", (DEMO_REVIEWER_EMAIL,)).fetchone()
+    conn.close()
+    return {"reviewer": _public_reviewer(rev)}
+
 def reviewer_queue(email):
     """A reviewer's own assigned decks: latest assignment per founder, joined with
     the founder brief and the current review status for that founder."""
@@ -680,6 +709,17 @@ def diagnostic_save(founder_id, deck_id, result):
     conn.commit()
     conn.close()
 
+def diagnostic_run_count(founder_id, days):
+    """How many FRESH (paid) AI reads this founder has run in the last `days` days.
+    A cached re-run of an identical deck is never saved, so it never counts here."""
+    conn = _db()
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM diagnostic WHERE founder_id=? "
+        "AND created_at >= datetime('now', ?)",
+        (founder_id, "-%d day" % int(days))).fetchone()
+    conn.close()
+    return row["n"] if row else 0
+
 # ---- load .env (private config: Zoho keys + optional Anthropic key) ----
 ENV = {}
 try:
@@ -697,6 +737,20 @@ ENV.update({k: v for k, v in os.environ.items()})
 ZOHO_CLIENT_ID = ENV.get("ZOHO_CLIENT_ID", "")
 ZOHO_CLIENT_SECRET = ENV.get("ZOHO_CLIENT_SECRET", "")
 ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY", "")
+
+# Founder abuse-control: cap how many FRESH (paid) AI diagnostic runs one founder
+# may do in a rolling window. Re-running the IDENTICAL deck is always free (it's
+# served from cache) and never counts. Tune these in .env without touching code;
+# set the cap to 0 to disable the limit entirely.
+try:
+    FOUNDER_DIAGNOSTIC_CAP = int(ENV.get("FOUNDER_DIAGNOSTIC_CAP", "2"))
+except ValueError:
+    FOUNDER_DIAGNOSTIC_CAP = 2
+try:
+    FOUNDER_DIAGNOSTIC_WINDOW_DAYS = int(ENV.get("FOUNDER_DIAGNOSTIC_WINDOW_DAYS", "30"))
+except ValueError:
+    FOUNDER_DIAGNOSTIC_WINDOW_DAYS = 30
+
 # Google sign-in ("Continue with Google"). This is the PUBLIC OAuth Client ID —
 # safe to expose to the browser (that's how Google's button works). There is NO
 # client secret here: the browser gets a signed ID token and the server only
@@ -2264,10 +2318,29 @@ class Handler(BaseHTTPRequestHandler):
                     })
                 else:
                     result = None
+                    capped = False
                     # Reuse a prior read for the same founder + identical deck instead of
                     # paying the API again (no double-charging for a re-run).
                     if founder_id and had_file:
                         result = diagnostic_find_reusable(founder_id, fname, len(raw))
+                    # Abuse control: a logged-in founder only gets a limited number of
+                    # FRESH paid reads per window. Cached re-runs above never reach here.
+                    if result is None and founder_id and FOUNDER_DIAGNOSTIC_CAP > 0 and \
+                            diagnostic_run_count(founder_id, FOUNDER_DIAGNOSTIC_WINDOW_DAYS) >= FOUNDER_DIAGNOSTIC_CAP:
+                        capped = True
+                        result = {
+                            "live": False,
+                            "capped": True,
+                            "summary": (
+                                "You've used all %d of your free AI positioning reads for this "
+                                "%d-day period. Re-running the exact same deck is always free — "
+                                "this limit only applies to brand-new reads, and it keeps the free "
+                                "diagnostic sustainable for everyone. You can still submit your deck "
+                                "for expert review now, or email admin.blr@tiebangalore.org if you "
+                                "genuinely need another read."
+                            ) % (FOUNDER_DIAGNOSTIC_CAP, FOUNDER_DIAGNOSTIC_WINDOW_DAYS),
+                            "findings": [],
+                        }
                     if result is None:
                         result = ai_diagnostic(deck_text, data.get("icp", ""), data.get("pitch", ""),
                                                images=deck_images)
@@ -2283,7 +2356,7 @@ class Handler(BaseHTTPRequestHandler):
                             diagnostic_save(founder_id, deck_id, result)
                     # Long-deck honesty flag: if the deck ran past what we read in full,
                     # tell the founder rather than silently analysing only the first part.
-                    if had_file and len(deck_text or "") > DECK_CHAR_LIMIT:
+                    if not capped and had_file and len(deck_text or "") > DECK_CHAR_LIMIT:
                         result["long_deck"] = True
                         result["summary"] = (
                             "Heads-up: this deck is longer than we read in full — only the first "
@@ -2291,6 +2364,13 @@ class Handler(BaseHTTPRequestHandler):
                             "trimming or splitting it for a complete read. "
                         ) + (result.get("summary") or "")
                     result["deck_id"] = deck_id
+                    # Tell the founder how many fresh reads they have left this window
+                    # (only meaningful for a logged-in founder when a cap is in force).
+                    if founder_id and FOUNDER_DIAGNOSTIC_CAP > 0:
+                        used = diagnostic_run_count(founder_id, FOUNDER_DIAGNOSTIC_WINDOW_DAYS)
+                        result["runs_remaining"] = max(0, FOUNDER_DIAGNOSTIC_CAP - used)
+                        result["runs_cap"] = FOUNDER_DIAGNOSTIC_CAP
+                        result["runs_window_days"] = FOUNDER_DIAGNOSTIC_WINDOW_DAYS
                     self._send(200, result)
             elif self.path == "/api/reviewer/signup":
                 out = reviewer_signup(data)
@@ -2301,6 +2381,8 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/reviewer/auth/google":
                 out = reviewer_google_login(data.get("credential", ""))
                 self._send(401 if out.get("error") else 200, out)
+            elif self.path == "/api/reviewer/demo":
+                self._send(200, reviewer_demo())
             elif self.path == "/api/reviewer/submit":
                 out = reviewer_submit(data.get("reviewer_email", ""), data.get("founder_id"),
                                       data.get("verdict", ""), data.get("gaps"), data.get("note", ""))

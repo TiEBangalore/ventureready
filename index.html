@@ -384,7 +384,7 @@ footer.site-footer{border-top:1px solid var(--border);margin-top:60px;padding:24
 .profile-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;}
 .profile-co{font-size:26px;font-weight:900;letter-spacing:-1px;margin:6px 0 4px;}
 .profile-meta{font-size:13px;color:var(--grey);}
-.profile-scores{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+.profile-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
 .pscore{border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;}
 .pscore-val{font-size:17px;font-weight:900;color:var(--green,#16A34A);white-space:nowrap;}
 .pscore-lbl{font-size:10.5px;color:var(--grey);margin-top:4px;line-height:1.3;}
@@ -790,7 +790,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
       <div class="how-step-row">
         <div class="how-step-num">1</div>
-        <div class="how-step-body"><h4>Free AI Diagnostic</h4><p>Upload your deck. Our AI analyses positioning, ICP specificity, messaging, and GTM — and surfaces your exact gaps in 90 seconds. No commitment, no payment.</p></div>
+        <div class="how-step-body"><h4>Free AI Diagnostic</h4><p>Upload your deck. Our AI analyses your <strong>positioning</strong> across four dimensions — positioning clarity, ICP specificity, messaging and GTM — and surfaces your exact gaps in 90 seconds. No commitment, no payment — <strong>2 free reads every 30 days</strong> (re-running the same deck is always free).</p></div>
       </div>
       <div class="how-step-row">
         <div class="how-step-num">2</div>
@@ -798,7 +798,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
       <div class="how-step-row">
         <div class="how-step-num">3</div>
-        <div class="how-step-body"><h4>Unlock expert review</h4><p>Join TiE Bangalore (₹10,000 + GST / yr) or pay ₹3,000 + GST for a one-time review. Complete the Positioning Questionnaire — structured questions on ICP, differentiation, and GTM.</p></div>
+        <div class="how-step-body"><h4>Unlock expert review</h4><p>Join TiE Bangalore (₹10,000 + GST / yr) or pay ₹3,000 + GST for a one-time review. Complete the questionnaire — one structured question for each of the six dimensions the expert scores.</p></div>
       </div>
       <div class="how-step-row">
         <div class="how-step-num">4</div>
@@ -806,7 +806,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
       <div class="how-step-row">
         <div class="how-step-num">5</div>
-        <div class="how-step-body"><h4>Earn the VentureReady mark</h4><p>Score Tier 2 or better on all four dimensions and TiE awards the VentureReady mark — a credibility signal that reflects your current positioning, not a permanent badge.</p></div>
+        <div class="how-step-body"><h4>Earn the VentureReady mark</h4><p>Score Tier 2 or better on all six dimensions and TiE awards the VentureReady mark — a credibility signal that reflects your current investor readiness, not a permanent badge.</p></div>
       </div>
       <div class="how-step-row">
         <div class="how-step-num">6</div>
@@ -837,7 +837,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
       <div class="how-step-row">
         <div class="how-step-num">4</div>
-        <div class="how-step-body"><h4>Browse validated deal flow</h4><p>Every founder in the pool has cleared TiE's expert positioning review. You see their current score across 4 dimensions — and a single coachability signal showing how they've improved.</p></div>
+        <div class="how-step-body"><h4>Browse validated deal flow</h4><p>Every founder in the pool has cleared TiE's expert review. You see their current score across 6 dimensions — and a single coachability signal showing how they've improved.</p></div>
       </div>
       <div class="how-step-row">
         <div class="how-step-num">5</div>
@@ -862,7 +862,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
   <div class="home-cta-band">
     <h2>Ready to stress-test your story?</h2>
-    <p>Upload your deck and get your free positioning diagnostic in 90 seconds.</p>
+    <p>Upload your deck and get your free positioning diagnostic in 90 seconds — 2 free reads every 30 days.</p>
     <button class="btn btn-red btn-lg" onclick="go('login')">Get Free Diagnostic →</button>
   </div>
 
@@ -945,11 +945,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <!-- Prototype demo shortcuts -->
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mid);margin-bottom:8px;text-align:center;">Prototype demo shortcuts</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
           <button class="btn btn-red" onclick="demoFounder()" style="font-size:12px;">Demo: Founder →</button>
           <button class="btn btn-dark" onclick="loggedInAs='investor';go('investor-dealflow')" style="font-size:12px;">Demo: Investor →</button>
+          <button class="btn btn-dark" onclick="reviewerDemo()" style="font-size:12px;">Demo: Reviewer →</button>
         </div>
-        <button class="btn btn-outline btn-full" onclick="go('reviewer-login')" style="font-size:12px;">Reviewer sign-in (TiE Charter Member) →</button>
+        <button class="btn btn-outline btn-full" onclick="go('reviewer-login')" style="font-size:12px;">Reviewer sign-in (real TiE Charter Member) →</button>
       </div>
 
       <div class="login-foot" style="margin-top:14px;">By continuing you agree to TiE Bangalore's <a onclick="go('terms')" style="color:var(--red);cursor:pointer;">Terms</a> and <a onclick="go('privacy')" style="color:var(--red);cursor:pointer;">Privacy Policy</a>.</div>
@@ -1003,7 +1004,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <div><span style="color:var(--red);font-weight:800;">✓</span> <strong>The ask</strong> — how much you're raising, and what it buys</div>
           <div><span style="color:var(--red);font-weight:800;">✓</span> <strong>One narrative</strong> — every slide points the same way</div>
         </div>
-        <div style="margin-top:14px;padding:11px 14px;background:#fff;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--grey);line-height:1.6;">These 12 make a <strong>complete</strong> deck. VentureReady's expert score zooms in on the part we can judge rigorously — your <strong>positioning</strong> — across four dimensions (Positioning Clarity, ICP Specificity, Messaging Hierarchy, GTM Sequencing). Team, traction and valuation are for the investor to weigh, not us.</div>
+        <div style="margin-top:14px;padding:11px 14px;background:#fff;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--grey);line-height:1.6;">These 12 make a <strong>complete</strong> deck. VentureReady's expert score reviews the <strong>six dimensions investors weigh</strong> — Problem, Market, Differentiation, Team, Traction and Unit Economics — and grades each against a calibrated tier bar.</div>
         <a href="VentureReady-Pitch-Deck-101.pdf" download style="display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:9px 16px;border:1.5px solid var(--red);color:var(--red);border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;">Download the checklist</a>
       </div>
     </details>
@@ -1078,6 +1079,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="directory-note">This is a reference directory only — no meeting requests from here. Once you earn the VentureReady mark, you can request meetings, and only with investors marked Active.</div>
     </div>
 
+    <div style="display:flex;align-items:flex-start;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:16px;font-size:12px;color:var(--grey);line-height:1.6;">
+      <span style="color:var(--red);font-weight:800;flex-shrink:0;">i</span>
+      <div>You get <strong style="color:var(--dark);">2 free AI reads every 30 days</strong>. Re-running the <em>same</em> deck is always free — the limit only applies to brand-new reads. Deeper, human scoring across all six investor-readiness dimensions comes with the paid expert review.</div>
+    </div>
     <div class="upload-actions">
       <button class="btn btn-outline" onclick="go('login')">← Back</button>
       <button class="btn btn-red btn-lg" onclick="runDiagnostic()">Run Free Diagnostic →</button>
@@ -1104,7 +1109,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <!-- Four-dimension findings, filled by the AI -->
     <h3 style="font-size:15px;margin:0 0 4px;">What the AI noticed — and what to fix first</h3>
-    <div class="sub-text" style="margin-bottom:18px;">One read on each of the four dimensions your expert reviewer will score later. VentureReady focuses on your <strong>positioning</strong> — team, traction and valuation are the investor's call, not ours, so we don't score them here.</div>
+    <div class="sub-text" style="margin-bottom:18px;">A free read on your <strong>positioning</strong> — Positioning Clarity, ICP Specificity, Messaging Hierarchy and GTM Sequencing. The paid expert review goes further: a TiE Charter Member scores all <strong>six investor-readiness dimensions</strong>, adding Team, Traction and Unit Economics that only a human can judge.</div>
     <div id="diag-findings" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;"></div>
 
     <div id="diag-download" style="display:none;margin:20px 0 0;">
@@ -1139,7 +1144,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <div>• A TiE Charter Member with investing experience</div>
             <div>• Judged on a calibrated 4-dimension rubric (Tiers)</div>
             <div>• Written feedback and a clear fix path</div>
-            <div>• Earns the VentureReady mark — if you clear Tier&nbsp;3 on all four</div>
+            <div>• Earns the VentureReady mark — if you clear the tier bar on all six</div>
           </div>
         </div>
       </div>
@@ -1156,8 +1161,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);">
         <div style="padding:20px 22px;border-right:1px solid var(--border);">
           <div style="font-size:20px;margin-bottom:8px;"></div>
-          <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Positioning Questionnaire</div>
-          <div style="font-size:12px;color:var(--grey);line-height:1.55;">Structured questions on your ICP, differentiation, and GTM — the same areas top VCs stress-test.</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Expert-Review Questionnaire</div>
+          <div style="font-size:12px;color:var(--grey);line-height:1.55;">One structured question for each of the six dimensions investors weigh — the same areas top VCs stress-test.</div>
         </div>
         <div style="padding:20px 22px;border-right:1px solid var(--border);">
           <div style="font-size:20px;margin-bottom:8px;"></div>
@@ -1212,9 +1217,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 <div id="screen-interview" class="screen">
   <div class="shell">
     <div style="margin-bottom:32px;">
-      <div class="overline">Step 2 of 3 · Positioning Questionnaire</div>
+      <div class="overline">Step 2 of 3 · Expert-Review Questionnaire</div>
       <h1 style="font-size:24px;font-weight:800;letter-spacing:-.5px;margin:6px 0 6px;">Tell us about your startup</h1>
-      <p style="font-size:13px;color:var(--grey);">These are the questions a TiE expert will review. Be as specific as possible — vague answers produce vague feedback.</p>
+      <p style="font-size:13px;color:var(--grey);">These are the questions a TiE expert will review. Answer for <strong>where you are today</strong> — the same six questions work at every stage. If you're early and don't have customers or revenue yet, share your <strong>hypothesis and earliest evidence</strong>; that's expected, and your reviewer weights the six dimensions by your stage.</p>
     </div>
 
     <!-- Carried over from the free step — populated from the founder's real free-diagnostic inputs + AI read (see populateInterview) -->
@@ -1234,31 +1239,46 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <div style="display:grid;grid-template-columns:1fr 260px;gap:32px;align-items:start;">
       <div>
-        <!-- Section 1: Positioning -->
+        <!-- The six questions map 1:1 to the six dimensions the expert scores. -->
+
+        <!-- Stage — declared by the founder so the reviewer weights the dimensions correctly -->
         <div style="margin-bottom:32px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
-            <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">1</div>
-            <div style="font-size:14px;font-weight:800;">Your Positioning</div>
-          </div>
           <div class="form-group">
-            <label>What problem do you solve, and why now?</label>
-            <textarea rows="3" placeholder="e.g. Newly-hired VPs of Sales must prove pipeline ROI within 90 days, but their CRM only flags deals after they've slipped — and boards now expect this visibility from day one."></textarea>
+            <label>What stage are you at, and what round are you raising (or planning)?</label>
+            <select id="q-stage" onchange="applyStagePrompts()" style="width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dark);background:#fff;">
+              <option value="">Select your stage…</option>
+              <option value="idea">Idea / pre-product</option>
+              <option value="pre_seed">Pre-seed (building, pre-revenue)</option>
+              <option value="seed">Seed</option>
+              <option value="series_a">Series A</option>
+              <option value="series_b_plus">Series B or later</option>
+              <option value="bootstrapped">Bootstrapped / revenue-funded</option>
+            </select>
+            <div style="font-size:11px;color:var(--grey);margin-top:8px;line-height:1.6;">Your reviewer weights the six dimensions by your stage — at pre-seed, <strong>Problem</strong> and <strong>Team</strong> carry more than <strong>Traction</strong>, and answers can be well-reasoned hypotheses. At later stages, evidence and <strong>Unit Economics</strong> carry more.</div>
           </div>
         </div>
 
-        <!-- Section 2: ICP -->
+        <!-- Section 1: Problem -->
+        <div style="margin-bottom:32px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
+            <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">1</div>
+            <div style="font-size:14px;font-weight:800;">Problem</div>
+          </div>
+          <div class="form-group">
+            <label>What urgent problem do you solve — who exactly feels it, what does the status quo cost them, and why now?</label>
+            <textarea id="q-problem" rows="3" placeholder="e.g. Newly-hired VPs of Sales must prove pipeline ROI within 90 days, but their CRM only flags deals after they've slipped — costing them a quarter of pipeline and, often, the job. Boards now expect this visibility from day one."></textarea>
+          </div>
+        </div>
+
+        <!-- Section 2: Market -->
         <div style="margin-bottom:32px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
             <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">2</div>
-            <div style="font-size:14px;font-weight:800;">Your Ideal Customer</div>
+            <div style="font-size:14px;font-weight:800;">Market</div>
           </div>
           <div class="form-group">
-            <label>Go deeper than the free step — company size, the buyer's exact role, and the trigger event that makes them ready to buy</label>
-            <textarea rows="3" placeholder="e.g. Series A B2B SaaS companies, $2M–$10M ARR, 5–15 AEs on Salesforce, where a new VP of Sales has joined in the last 90 days and must show the board pipeline ROI."></textarea>
-          </div>
-          <div class="form-group">
-            <label>What does your customer look like right before they buy from you?</label>
-            <textarea rows="3" placeholder="What just happened in their company, team, or role that makes them ready to pay?"></textarea>
+            <label>How large is the opportunity, and is that spending happening now? Are you early in a forming market or a late entrant in a crowded one?</label>
+            <textarea id="q-market" rows="3" placeholder="e.g. ~12,000 Series A SaaS companies in our ICP today, each spending ₹15–40L/yr on sales tooling — a budget line that already exists. The shift to real-time revenue intelligence is early (post-Gong) but accelerating; we're an early entrant in phase two."></textarea>
           </div>
         </div>
 
@@ -1266,31 +1286,47 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="margin-bottom:32px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
             <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">3</div>
-            <div style="font-size:14px;font-weight:800;">Your Differentiation</div>
+            <div style="font-size:14px;font-weight:800;">Differentiation</div>
           </div>
           <div class="form-group">
-            <label>Who are your top 2–3 competitors, and how are you different?</label>
-            <textarea rows="3" placeholder="e.g. Unlike Gong (which reports on the past), we surface deal risk in real time. Unlike Clari (pipeline forecasting), we focus on individual deal execution."></textarea>
-          </div>
-          <div class="form-group">
-            <label>What is your unfair advantage — something competitors cannot easily copy?</label>
-            <textarea rows="3" placeholder="Proprietary data, unique distribution, founder expertise, technology moat…"></textarea>
+            <label>Who are your top 2–3 alternatives, how are you different, and what's the edge a competitor can't easily copy?</label>
+            <textarea id="q-diff" rows="3" placeholder="e.g. Unlike Gong (reports on the past) and Clari (pipeline forecasting), we surface individual deal risk in real time. The hard-to-copy edge: a Salesforce-native execution layer built on 3 years of proprietary deal-signal data."></textarea>
           </div>
         </div>
 
-        <!-- Section 4: GTM -->
+        <!-- Section 4: Team -->
         <div style="margin-bottom:32px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
             <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">4</div>
-            <div style="font-size:14px;font-weight:800;">Your Go-To-Market</div>
+            <div style="font-size:14px;font-weight:800;">Team</div>
           </div>
           <div class="form-group">
-            <label>How do you reach and close your first 10 customers?</label>
-            <textarea rows="3" placeholder="e.g. Direct outbound to newly-posted VP of Sales job listings, targeting Salesforce shops. Close in 2 calls with a 14-day free trial."></textarea>
+            <label>Who is on your founding team, and why are you the ones to win this? (founder–market fit, complementary skills, and what you've built or sold together)</label>
+            <textarea id="q-team" rows="3" placeholder="e.g. Two co-founders: ex-VP Sales at a Series B SaaS (lived the problem) and an ex-Salesforce staff engineer (built on the platform). We shipped and sold a prior sales tool together to 40 customers."></textarea>
+          </div>
+        </div>
+
+        <!-- Section 5: Traction -->
+        <div style="margin-bottom:32px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
+            <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">5</div>
+            <div style="font-size:14px;font-weight:800;">Traction</div>
           </div>
           <div class="form-group">
-            <label>What's your revenue model and typical deal size?</label>
-            <input type="text" placeholder="e.g. Annual SaaS, ₹8L/year per team of 10 AEs." />
+            <label>What evidence do you have that customers want this? Share whatever is real for your stage, and how you reach your first (or next) customers.</label>
+            <textarea id="q-traction" rows="3" placeholder="Early stage — e.g. 40 user interviews, a 300-person waitlist, and 2 unpaid pilots underway; reaching users via founder-led outreach in 3 communities.&#10;Later stage — e.g. 11 paying teams (₹0 → ₹42L ARR in 7 months), 3 signed LOIs, 92% retention; acquired via outbound to newly-posted VP of Sales roles, closing in 2 calls."></textarea>
+          </div>
+        </div>
+
+        <!-- Section 6: Unit Economics -->
+        <div style="margin-bottom:32px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
+            <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">6</div>
+            <div style="font-size:14px;font-weight:800;">Unit Economics</div>
+          </div>
+          <div class="form-group">
+            <label>What do the economics of a single customer look like? If you have revenue, show the real numbers; if you're pre-revenue, give your pricing hypothesis and the assumptions behind it.</label>
+            <textarea id="q-economics" rows="3" placeholder="Pre-revenue — e.g. planned ₹6–8L/yr per customer; comparable tools charge ₹5–10L; we expect CAC to land near one quarter's revenue and gross margin ~75% once onboarding is self-serve.&#10;With revenue — e.g. ₹8L/yr per team; CAC ~₹1.2L (payback under 3 months); gross margin ~82%."></textarea>
           </div>
         </div>
 
@@ -1311,7 +1347,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             </div>
             <div style="display:flex;gap:10px;align-items:flex-start;">
               <div style="color:var(--red);font-size:14px;flex-shrink:0;margin-top:1px;">→</div>
-              <div style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.55;">You receive written feedback and a positioning score across 4 dimensions.</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.55;">You receive written feedback and a score across 6 investor-readiness dimensions.</div>
             </div>
             <div style="display:flex;gap:10px;align-items:flex-start;">
               <div style="color:var(--red);font-size:14px;flex-shrink:0;margin-top:1px;">→</div>
@@ -1391,7 +1427,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:12px;">What happens next</div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <div style="color:var(--red);font-weight:800;flex-shrink:0;">1</div>
-          <div style="font-size:12.5px;color:var(--dark);line-height:1.55;">A TiE expert reviews your positioning against the four-dimension rubric.</div>
+          <div style="font-size:12.5px;color:var(--dark);line-height:1.55;">A TiE expert reviews your deck against the six-dimension rubric.</div>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <div style="color:var(--red);font-weight:800;flex-shrink:0;">2</div>
@@ -1470,7 +1506,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:22px;">
       <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Where you fell short</div>
-      <div style="font-size:12px;color:var(--grey);margin-bottom:14px;">Tier 2 or better is required on all four dimensions to earn the mark.</div>
+      <div style="font-size:12px;color:var(--grey);margin-bottom:14px;">Tier 2 or better is required on all six dimensions to earn the mark.</div>
       <div id="ny-gaps"></div>
     </div>
 
@@ -1583,7 +1619,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="expert-av">RK</div>
       <div>
         <div class="expert-name">Rajan Kumar · TiE Reviewer, ex-VP Sales at Freshworks</div>
-        <div class="expert-q">"Strong ICP specificity and a clear 90-day outcome anchor. The main unlock is validating the 'only platform' claim before you lead with it — get one reference customer to go on record and this pitch closes faster."</div>
+        <div class="expert-q">"A genuinely urgent problem and a credible, complementary team. The main unlock is validating the 'only platform' differentiation claim before you lead with it — get one reference customer to go on record and this pitch closes faster."</div>
       </div>
     </div>
 
@@ -1956,7 +1992,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <div class="deal-verdict dv-ready">✓ VentureReady</div>
         </div>
         <div class="deal-pitch">Remote vitals monitoring for tier-2 city diagnostic chains, priced per-bed instead of per-device.</div>
-        <div class="deal-coach"><span class="dot">●</span>Earned the mark on first review — strong ICP specificity from day one.</div>
+        <div class="deal-coach"><span class="dot">●</span>Earned the mark on first review — a sharp problem and strong team from day one.</div>
       </div>
       <div class="deal-card" onclick="openFounderProfile(this)">
         <div class="deal-card-hd">
@@ -1964,7 +2000,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <div class="deal-verdict dv-ready">✓ VentureReady</div>
         </div>
         <div class="deal-pitch">Reconciliation automation for D2C brands running on multiple payment gateways.</div>
-        <div class="deal-coach"><span class="dot">●</span>Earned the VentureReady mark after a second review on GTM sequencing.</div>
+        <div class="deal-coach"><span class="dot">●</span>Earned the VentureReady mark after a second review strengthened traction.</div>
       </div>
       <div class="deal-card" onclick="openFounderProfile(this)">
         <div class="deal-card-hd">
@@ -2053,7 +2089,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
   var FOUNDER_RICH = {
     'Stackr': {
       av:'RK', name:'Rajan Kumar · TiE Reviewer, ex-VP Sales at Freshworks',
-      quote:'"Strong ICP specificity and a clear 90-day outcome anchor. The founder validated their \'only platform\' claim with a reference customer since the last review — this pitch is ready for institutional conversations."',
+      quote:'"A genuinely urgent problem, a credible team and a clear per-customer economic story. The founder validated their \'only platform\' claim with a reference customer since the last review — this pitch is ready for institutional conversations."',
       tiers:['Tier 2 ✓','Tier 1 ✓','Tier 2 ✓','Tier 2 ✓']
     },
     'Scalene LivProtec': {
@@ -2125,11 +2161,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     </div>
 
     <div class="profile-scores">
-      <div class="pscore"><div class="pscore-val" id="prof-t1">Tier 2 ✓</div><div class="pscore-lbl">Positioning Clarity</div></div>
-      <div class="pscore"><div class="pscore-val" id="prof-t2">Tier 1 ✓</div><div class="pscore-lbl">ICP Specificity</div></div>
-      <div class="pscore"><div class="pscore-val" id="prof-t3">Tier 2 ✓</div><div class="pscore-lbl">Messaging Hierarchy</div></div>
-      <div class="pscore"><div class="pscore-val" id="prof-t4">Tier 2 ✓</div><div class="pscore-lbl">GTM Sequencing</div></div>
+      <div class="pscore"><div class="pscore-val" id="prof-t1">Tier 2 ✓</div><div class="pscore-lbl">Problem</div></div>
+      <div class="pscore"><div class="pscore-val" id="prof-t2">Tier 2 ✓</div><div class="pscore-lbl">Market</div></div>
+      <div class="pscore"><div class="pscore-val" id="prof-t3">Tier 1 ✓</div><div class="pscore-lbl">Differentiation</div></div>
+      <div class="pscore"><div class="pscore-val" id="prof-t4">Tier 2 ✓</div><div class="pscore-lbl">Team</div></div>
+      <div class="pscore"><div class="pscore-val" id="prof-t5">Tier 2 ✓</div><div class="pscore-lbl">Traction</div></div>
+      <div class="pscore"><div class="pscore-val" id="prof-t6">Tier 2 ✓</div><div class="pscore-lbl">Unit Economics</div></div>
     </div>
+    <div style="font-size:12px;color:var(--dark);line-height:1.55;margin:0 0 14px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 13px;"><strong style="color:#047857;">Human-validated.</strong> Every VentureReady mark is awarded by a TiE Charter Member who scored this founder across all 6 investor-readiness dimensions — not an AI. The AI handles only the first-pass positioning read.</div>
     <div style="font-size:11.5px;color:var(--grey);line-height:1.6;margin:-4px 0 24px;background:#F9FAFB;border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
       <span style="font-weight:700;color:var(--dark);">What the tiers mean.</span> A TiE expert scores each dimension on a 1&#8211;4 ladder where <strong>Tier&nbsp;1 is the top</strong> (lower is better). <span style="color:var(--green);font-weight:700;">Tier&nbsp;2</span> is the bar to earn the VentureReady mark.
       <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;">
@@ -2144,7 +2183,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="expert-av" id="prof-exp-av">RK</div>
       <div>
         <div class="expert-name" id="prof-exp-name">Rajan Kumar · TiE Reviewer, ex-VP Sales at Freshworks</div>
-        <div class="expert-q" id="prof-exp-q">"Strong ICP specificity and a clear 90-day outcome anchor. The founder validated their 'only platform' claim with a reference customer since the last review — this pitch is ready for institutional conversations."</div>
+        <div class="expert-q" id="prof-exp-q">"A genuinely urgent problem, a credible team and a clear per-customer economic story. The founder validated their 'only platform' claim with a reference customer since the last review — this pitch is ready for institutional conversations."</div>
       </div>
     </div>
 
@@ -2234,6 +2273,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <button class="btn btn-red btn-full btn-lg" onclick="reviewerLogin()">Sign In →</button>
       <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--mid);">
         First time? <a onclick="reviewerSignup()" style="color:var(--red);cursor:pointer;font-weight:600;">Create your reviewer account</a>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);text-align:center;">
+        <button class="btn btn-outline btn-full" onclick="reviewerDemo()">Explore as a demo reviewer →</button>
+        <div style="font-size:11px;color:var(--mid);margin-top:6px;">Signs you in with a demo deck already assigned to review.</div>
       </div>
       <div style="text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
         <a onclick="go('login')" style="font-size:12px;color:var(--mid);cursor:pointer;">← Back to sign-in options</a>
@@ -2377,10 +2420,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mid);">Founder questionnaire answers</span>
         </div>
         <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
-          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Positioning statement</div><div id="rev-q-positioning" style="font-size:13px;color:var(--dark);line-height:1.65;">For newly-hired VPs of Sales at Series A SaaS companies with 5–15 AE teams on Salesforce who need to prove ROI within 90 days — we're the only platform that surfaces deal risk in real time, unlike Gong or Clari which report on the past.</div></div>
-          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">ICP trigger event</div><div id="rev-q-icp" style="font-size:13px;color:var(--dark);line-height:1.65;">A new VP of Sales joins a Series A company on Salesforce within the last 90 days. They need to show the board pipeline ROI before Q2 review. That's our trigger.</div></div>
-          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Differentiation</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Gong/Clari report on what happened. We surface risk before it happens. Our unfair advantage: we run on the Salesforce native layer — no integration needed, no IT ticket required.</div></div>
-          <div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">GTM first 10 customers</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Outbound to VP Sales who joined in the last 90 days via LinkedIn, targeting Salesforce native orgs with 5–15 AEs. Average CAC ₹4,200, LTV projected at ₹1.2L over 18 months.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Problem</div><div id="rev-q-problem" style="font-size:13px;color:var(--dark);line-height:1.65;">Newly-hired VPs of Sales at Series A SaaS must prove pipeline ROI within 90 days, but their CRM only flags deals after they've slipped — costing a quarter of pipeline and often the job. Boards now expect this visibility from day one.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Market</div><div id="rev-q-market" style="font-size:13px;color:var(--dark);line-height:1.65;">~12,000 Series A SaaS companies in our ICP, each already spending ₹15–40L/yr on sales tooling. The shift to real-time revenue intelligence is early (post-Gong) but accelerating — we're an early entrant in phase two.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Differentiation</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Gong/Clari report on what happened; we surface deal risk before it happens. Hard-to-copy edge: a Salesforce-native execution layer on 3 years of proprietary deal-signal data — no integration, no IT ticket.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Team</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Two co-founders: ex-VP Sales at a Series B SaaS (lived the problem) and an ex-Salesforce staff engineer (built on the platform). Shipped and sold a prior sales tool together to 40 customers.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Traction</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">11 paying teams (₹0 → ₹42L ARR in 7 months), 3 signed LOIs, 92% logo retention. Acquired via outbound to VPs of Sales who joined in the last 90 days; closing in 2 calls with a 14-day trial.</div></div>
+          <div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Unit Economics</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">₹8L/yr per team of 10 AEs; CAC ~₹1.2L (payback under 3 months); gross margin ~82%. Self-serve onboarding keeps cost-to-serve low as we scale.</div></div>
         </div>
 
         <!-- Step 3 — Written review -->
@@ -2393,7 +2438,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px;font-size:12.5px;color:var(--dark);line-height:1.7;">
             <div style="font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--grey);margin-bottom:10px;">What to cover</div>
-            <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">1.</span><div><strong>One strong thing</strong> — what's genuinely working about their positioning or ICP definition. Be specific — not "good job" but "your trigger event is time-bound and tied to a budget moment, which is exactly what investors want to see."</div></div>
+            <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">1.</span><div><strong>One strong thing</strong> — the dimension that's genuinely working. Be specific — not "good job" but "your traction is real: 11 paying teams with 92% retention is exactly the proof investors want to see."</div></div>
             <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">2.</span><div><strong>The critical gap</strong> — the single biggest thing holding back investor-readiness. Give a specific, actionable fix, not a vague suggestion.</div></div>
             <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">3.</span><div><strong>Score rationale</strong> — briefly explain any dimension that missed the Tier 2 bar so the founder understands exactly what Tier 2 requires, not just that they fell short.</div></div>
             <div style="display:flex;gap:9px;"><span style="color:#6D28D9;font-weight:800;">4.</span><div><strong>If "Not Yet"</strong> — close with a clear statement of exactly what must change before resubmission. Make the path forward unambiguous.</div></div>
@@ -2429,23 +2474,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--charcoal);color:#fff;font-size:12px;font-weight:800;">2</span>
             <span style="font-size:13px;font-weight:800;">BARS Rubric Scorecard</span>
           </div>
-          <div style="font-size:11px;color:var(--grey);margin:0 0 18px 31px;">Score each dimension. Mark requires Tier 2 or better (Tier 1–2) on all four independently.</div>
+          <div style="font-size:11px;color:var(--grey);margin:0 0 12px 31px;">Score each dimension. Mark requires Tier 2 or better (Tier 1–2) on all six independently. Weight by stage — for a pre-seed company, problem and team carry more than traction.</div>
+          <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:6px;padding:9px 12px;margin:0 0 16px 31px;font-size:11px;color:#5B21B6;line-height:1.55;">The free AI already covered the founder's <strong>positioning</strong> (Positioning Clarity, ICP, Messaging, GTM). Your judgment matters most on <strong>Team, Traction, Unit Economics and Market</strong> — the dimensions AI can't assess.</div>
 
           <div class="rubric-row">
-            <div class="rubric-dim">Positioning<br/>Clarity</div>
-            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: clear problem, named buyer, differentiation claimed (needs validation)</div></div>
+            <div class="rubric-dim">Problem</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: an urgent, must-have problem; clear who feels it and what the status quo costs them</div></div>
           </div>
           <div class="rubric-row">
-            <div class="rubric-dim">ICP<br/>Specificity</div>
-            <div><div class="tier-btns"><button class="tier-btn selected" onclick="selectTier(this)">T1</button><button class="tier-btn" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T1: company size + role + trigger event + can name 3 real example companies</div></div>
+            <div class="rubric-dim">Market</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: real addressable spend happening now (not just a big future TAM); timing understood</div></div>
           </div>
           <div class="rubric-row">
-            <div class="rubric-dim">Messaging<br/>Hierarchy</div>
-            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: hero message present, right proof points, no internal contradiction</div></div>
+            <div class="rubric-dim">Differentiation</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: a specific edge vs the real alternative buyers use today (claimed, needs validation)</div></div>
           </div>
           <div class="rubric-row">
-            <div class="rubric-dim">GTM<br/>Sequencing</div>
-            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: first 10 customer plan exists, CAC stated, motion is repeatable</div></div>
+            <div class="rubric-dim">Team</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: relevant founder-market fit and complementary (not overlapping) skills shown</div></div>
+          </div>
+          <div class="rubric-row">
+            <div class="rubric-dim">Traction</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: real early proof — paying customers, retained usage or signed LOIs (not just interest)</div></div>
+          </div>
+          <div class="rubric-row">
+            <div class="rubric-dim">Unit<br/>Economics</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: revenue per customer shown with a credible path to a healthy margin at scale</div></div>
           </div>
 
           <div class="mark-eligibility" style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:6px;padding:10px 12px;margin-top:4px;font-size:12px;color:var(--green);font-weight:700;">
@@ -2528,10 +2582,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mid);">Founder questionnaire answers</span>
         </div>
         <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
-          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Positioning statement</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">For tier-2 city diagnostic chains (20–80 beds) that can't justify per-device monitoring hardware, Ferra delivers continuous remote vitals at a per-bed monthly price — unlike Philips or GE rigs that need heavy capex and a biomedical engineer on staff.</div></div>
-          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">ICP trigger event</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">A tier-2 chain opens a new branch or ICU wing and needs monitoring coverage without the capex of per-device hardware. That capex moment is our trigger. Three chains — Sanjeevani, Aarogya, MediCare Plus — fit this exactly.</div></div>
-          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Differentiation</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Incumbents sell hardware per device on long procurement cycles. We're software-led on low-cost sensors, billed per occupied bed — the chain pays only for what it uses, scales month to month, and needs no biomedical engineer.</div></div>
-          <div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">GTM first 10 customers</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Warm intros from our clinical advisor into the three named chains, opening with a paid 30-bed pilot per chain. Per-bed price ~₹900/bed/month; pilot ACV ~₹1.5L, expanding branch by branch as each chain adds ICU capacity.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Problem</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Tier-2 diagnostic chains (20–80 beds) can't justify the capex of per-device monitoring hardware, so new ICU wings open without continuous vitals coverage — a patient-safety and compliance gap that bites the moment a branch opens.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Market</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">~3,500 tier-2 chains in India adding ICU capacity, a monitoring spend that already exists as capex today. The move to per-bed opex monitoring is early — we're an early entrant as the category forms.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Differentiation</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Unlike Philips/GE rigs (heavy capex, a biomedical engineer on staff), Ferra delivers continuous remote vitals at a per-bed monthly price. Edge: a device-agnostic remote-monitoring layer that needs no on-site biomed team.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Team</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Founder is an ex-Medtronic field engineer (deployed monitoring in exactly these chains) with a clinical co-founder (practising intensivist). They ran two hospital pilots together before incorporating.</div></div>
+          <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Traction</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">3 paying chains (Sanjeevani, Aarogya, MediCare Plus), 30-bed paid pilots each, retained 6+ months and expanding branch by branch. Warm intros via our clinical advisor.</div></div>
+          <div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Unit Economics</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">~₹900/bed/month; pilot ACV ~₹1.5L expanding to ₹6–8L per chain; low CAC via warm clinical intros; contribution margin turns healthy once a chain crosses two branches.</div></div>
         </div>
 
         <!-- Step 3 — Written review -->
@@ -2544,7 +2600,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px;font-size:12.5px;color:var(--dark);line-height:1.7;">
             <div style="font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--grey);margin-bottom:10px;">What to cover</div>
-            <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">1.</span><div><strong>One strong thing</strong> — what's genuinely working about their positioning or ICP definition. Be specific — not "good job" but "your trigger event is time-bound and tied to a budget moment, which is exactly what investors want to see."</div></div>
+            <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">1.</span><div><strong>One strong thing</strong> — the dimension that's genuinely working. Be specific — not "good job" but "your traction is real: 11 paying teams with 92% retention is exactly the proof investors want to see."</div></div>
             <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">2.</span><div><strong>The critical gap</strong> — the single biggest thing holding back investor-readiness. Give a specific, actionable fix, not a vague suggestion.</div></div>
             <div style="display:flex;gap:9px;margin-bottom:8px;"><span style="color:#6D28D9;font-weight:800;">3.</span><div><strong>Score rationale</strong> — briefly explain any dimension that missed the Tier 2 bar so the founder understands exactly what Tier 2 requires, not just that they fell short.</div></div>
             <div style="display:flex;gap:9px;"><span style="color:#6D28D9;font-weight:800;">4.</span><div><strong>If "Not Yet"</strong> — close with a clear statement of exactly what must change before resubmission. Make the path forward unambiguous.</div></div>
@@ -2580,23 +2636,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--charcoal);color:#fff;font-size:12px;font-weight:800;">2</span>
             <span style="font-size:13px;font-weight:800;">BARS Rubric Scorecard</span>
           </div>
-          <div style="font-size:11px;color:var(--grey);margin:0 0 18px 31px;">Score each dimension. Mark requires Tier 2 or better (Tier 1–2) on all four independently.</div>
+          <div style="font-size:11px;color:var(--grey);margin:0 0 12px 31px;">Score each dimension. Mark requires Tier 2 or better (Tier 1–2) on all six independently. Weight by stage — for a pre-seed company, problem and team carry more than traction.</div>
+          <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:6px;padding:9px 12px;margin:0 0 16px 31px;font-size:11px;color:#5B21B6;line-height:1.55;">The free AI already covered the founder's <strong>positioning</strong> (Positioning Clarity, ICP, Messaging, GTM). Your judgment matters most on <strong>Team, Traction, Unit Economics and Market</strong> — the dimensions AI can't assess.</div>
 
           <div class="rubric-row">
-            <div class="rubric-dim">Positioning<br/>Clarity</div>
-            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: clear problem, named buyer, differentiation claimed (needs validation)</div></div>
+            <div class="rubric-dim">Problem</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: an urgent, must-have problem; clear who feels it and what the status quo costs them</div></div>
           </div>
           <div class="rubric-row">
-            <div class="rubric-dim">ICP<br/>Specificity</div>
-            <div><div class="tier-btns"><button class="tier-btn selected" onclick="selectTier(this)">T1</button><button class="tier-btn" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T1: company size + role + trigger event + can name 3 real example companies</div></div>
+            <div class="rubric-dim">Market</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: real addressable spend happening now (not just a big future TAM); timing understood</div></div>
           </div>
           <div class="rubric-row">
-            <div class="rubric-dim">Messaging<br/>Hierarchy</div>
-            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: hero message present, right proof points, no internal contradiction</div></div>
+            <div class="rubric-dim">Differentiation</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: a specific edge vs the real alternative buyers use today (claimed, needs validation)</div></div>
           </div>
           <div class="rubric-row">
-            <div class="rubric-dim">GTM<br/>Sequencing</div>
-            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: first 10 customer plan exists, CAC stated, motion is repeatable</div></div>
+            <div class="rubric-dim">Team</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: relevant founder-market fit and complementary (not overlapping) skills shown</div></div>
+          </div>
+          <div class="rubric-row">
+            <div class="rubric-dim">Traction</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: real early proof — paying customers, retained usage or signed LOIs (not just interest)</div></div>
+          </div>
+          <div class="rubric-row">
+            <div class="rubric-dim">Unit<br/>Economics</div>
+            <div><div class="tier-btns"><button class="tier-btn" onclick="selectTier(this)">T1</button><button class="tier-btn selected" onclick="selectTier(this)">T2</button><button class="tier-btn" onclick="selectTier(this)">T3</button><button class="tier-btn" onclick="selectTier(this)">T4</button></div><div class="tier-desc" style="font-size:10px;color:var(--grey);margin-top:6px;">T2: revenue per customer shown with a credible path to a healthy margin at scale</div></div>
           </div>
 
           <div class="mark-eligibility" style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:6px;padding:10px 12px;margin-top:4px;font-size:12px;color:var(--green);font-weight:700;">
@@ -2895,7 +2960,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="flex:1;min-width:150px;text-align:center;padding:0 8px;">
           <div style="width:30px;height:30px;border-radius:50%;background:#fdeaea;color:#c8202a;display:flex;align-items:center;justify-content:center;font-weight:800;margin:0 auto 8px;">1</div>
           <div style="font-size:12px;font-weight:700;color:var(--dark);">Review 1 — &ldquo;Not Yet&rdquo;</div>
-          <div style="font-size:11px;color:var(--grey);margin-top:3px;">GTM Sequencing below the Tier 2 bar. Gap list + fix path issued.</div>
+          <div style="font-size:11px;color:var(--grey);margin-top:3px;">Traction below the Tier 2 bar. Gap list + fix path issued.</div>
         </div>
         <div style="display:flex;align-items:center;color:var(--mid);font-weight:800;">→</div>
         <div style="flex:1;min-width:150px;text-align:center;padding:0 8px;">
@@ -2907,13 +2972,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="flex:1;min-width:150px;text-align:center;padding:0 8px;">
           <div style="width:30px;height:30px;border-radius:50%;background:#eef2ff;color:#3949ab;display:flex;align-items:center;justify-content:center;font-weight:800;margin:0 auto 8px;">3</div>
           <div style="font-size:12px;font-weight:700;color:var(--dark);">Re-review</div>
-          <div style="font-size:11px;color:var(--grey);margin-top:3px;">Same rubric, scored again on all four dimensions.</div>
+          <div style="font-size:11px;color:var(--grey);margin-top:3px;">Same rubric, scored again on all six dimensions.</div>
         </div>
         <div style="display:flex;align-items:center;color:var(--mid);font-weight:800;">→</div>
         <div style="flex:1;min-width:150px;text-align:center;padding:0 8px;">
           <div style="width:30px;height:30px;border-radius:50%;background:#e6f4ea;color:#1e7e34;display:flex;align-items:center;justify-content:center;font-weight:800;margin:0 auto 8px;">✓</div>
           <div style="font-size:12px;font-weight:700;color:var(--dark);">Mark issued</div>
-          <div style="font-size:11px;color:var(--grey);margin-top:3px;">Tier 2 or better on all four. Countersigned by TiE.</div>
+          <div style="font-size:11px;color:var(--grey);margin-top:3px;">Tier 2 or better on all six. Countersigned by TiE.</div>
         </div>
       </div>
     </div>
@@ -2951,25 +3016,35 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <div style="font-size:13px;font-weight:700;" id="fp-score-hist">Score history — Stackr</div>
             <div style="font-size:11px;color:var(--grey);margin-top:2px;">4 diagnostic runs · 2 expert reviews</div>
           </div>
-          <div style="font-size:11px;color:var(--mid);">Tier 2 threshold: required on all 4 dimensions</div>
+          <div style="font-size:11px;color:var(--mid);">Tier 2 threshold: required on all 6 dimensions</div>
         </div>
         <div class="dim-row">
-          <div class="dim-hd"><span class="dim-name">Positioning Clarity</span><span><span class="dim-val">82%</span><span class="dim-trend trend-up">↑ +37%</span></span></div>
-          <div class="pbar"><div class="pfill" style="width:82%"></div></div>
-          <div class="dim-bench">Started at 45% · Bar for the mark: Tier 2 (~80%)</div>
+          <div class="dim-hd"><span class="dim-name">Problem</span><span><span class="dim-val">84%</span><span class="dim-trend trend-up">↑ +29%</span></span></div>
+          <div class="pbar"><div class="pfill" style="width:84%"></div></div>
+          <div class="dim-bench">Started at 55% · Bar for the mark: Tier 2 (~80%)</div>
         </div>
         <div class="dim-row">
-          <div class="dim-hd"><span class="dim-name">ICP Specificity</span><span><span class="dim-val">88%</span><span class="dim-trend trend-up">↑ +26%</span></span></div>
+          <div class="dim-hd"><span class="dim-name">Market</span><span><span class="dim-val">80%</span><span class="dim-trend trend-up">↑ +32%</span></span></div>
+          <div class="pbar"><div class="pfill" style="width:80%"></div></div>
+          <div class="dim-bench">Started at 48% · Bar for the mark: Tier 2 (~80%)</div>
+        </div>
+        <div class="dim-row">
+          <div class="dim-hd"><span class="dim-name">Differentiation</span><span><span class="dim-val">88%</span><span class="dim-trend trend-up">↑ +37%</span></span></div>
           <div class="pbar"><div class="pfill" style="width:88%"></div></div>
-          <div class="dim-bench">Started at 62% · Bar for the mark: Tier 2 (~80%)</div>
+          <div class="dim-bench">Started at 51% · Bar for the mark: Tier 2 (~80%) ✓</div>
         </div>
         <div class="dim-row">
-          <div class="dim-hd"><span class="dim-name">Messaging Hierarchy</span><span><span class="dim-val">75%</span><span class="dim-trend trend-up">↑ +37%</span></span></div>
-          <div class="pbar"><div class="pfill" style="width:75%"></div></div>
-          <div class="dim-bench">Started at 38% · Bar for the mark: Tier 2 (~80%) ✓</div>
+          <div class="dim-hd"><span class="dim-name">Team</span><span><span class="dim-val">86%</span><span class="dim-trend trend-up">↑ +18%</span></span></div>
+          <div class="pbar"><div class="pfill" style="width:86%"></div></div>
+          <div class="dim-bench">Started at 68% · Bar for the mark: Tier 2 (~80%)</div>
         </div>
         <div class="dim-row">
-          <div class="dim-hd"><span class="dim-name">GTM Sequencing</span><span><span class="dim-val">79%</span><span class="dim-trend trend-up">↑ +24%</span></span></div>
+          <div class="dim-hd"><span class="dim-name">Traction</span><span><span class="dim-val">78%</span><span class="dim-trend trend-up">↑ +40%</span></span></div>
+          <div class="pbar"><div class="pfill" style="width:78%"></div></div>
+          <div class="dim-bench">Started at 38% · Bar for the mark: Tier 2 (~80%)</div>
+        </div>
+        <div class="dim-row">
+          <div class="dim-hd"><span class="dim-name">Unit Economics</span><span><span class="dim-val">79%</span><span class="dim-trend trend-up">↑ +24%</span></span></div>
           <div class="pbar"><div class="pfill" style="width:79%"></div></div>
           <div class="dim-bench">Started at 55% · Bar for the mark: Tier 2 (~80%)</div>
         </div>
@@ -3022,10 +3097,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;">
         <div style="font-size:13px;font-weight:700;margin-bottom:14px;" id="fp-activity-hd">Recent activity — Stackr</div>
         <div class="activity-item"><div class="activity-dot ad-green"></div><div><strong>VentureReady mark awarded</strong><br><span style="color:var(--mid);font-size:11px;">Profile now visible to investors · 3 days ago</span></div></div>
-        <div class="activity-item"><div class="activity-dot ad-green"></div><div><strong>Re-review completed</strong> by Rajan Kumar — Mark issued<br><span style="color:var(--mid);font-size:11px;">Tier 2 or better on all four · 81% avg · 5 days ago</span></div></div>
+        <div class="activity-item"><div class="activity-dot ad-green"></div><div><strong>Re-review completed</strong> by Rajan Kumar — Mark issued<br><span style="color:var(--mid);font-size:11px;">Tier 2 or better on all six · 81% avg · 5 days ago</span></div></div>
         <div class="activity-item"><div class="activity-dot ad-blue"></div><div><strong>Revised deck &amp; questionnaire resubmitted</strong><br><span style="color:var(--mid);font-size:11px;">Change confirmed — sent for free re-review · 7 days ago</span></div></div>
-        <div class="activity-item"><div class="activity-dot ad-grey"></div><div><strong>Review 1 returned &ldquo;Not Yet&rdquo;</strong> by Rajan Kumar<br><span style="color:var(--mid);font-size:11px;">GTM Sequencing below the Tier 2 bar · gap list + fix path · 11 days ago</span></div></div>
-        <div class="activity-item"><div class="activity-dot ad-grey"></div><div><strong>Diagnostic run #4</strong> — Avg score 76%<br><span style="color:var(--mid);font-size:11px;">Messaging Hierarchy improved to 75% · 12 days ago</span></div></div>
+        <div class="activity-item"><div class="activity-dot ad-grey"></div><div><strong>Review 1 returned &ldquo;Not Yet&rdquo;</strong> by Rajan Kumar<br><span style="color:var(--mid);font-size:11px;">Traction below the Tier 2 bar · gap list + fix path · 11 days ago</span></div></div>
+        <div class="activity-item"><div class="activity-dot ad-grey"></div><div><strong>Diagnostic run #4</strong> — Avg score 76%<br><span style="color:var(--mid);font-size:11px;">Differentiation improved to 75% · 12 days ago</span></div></div>
         <div class="activity-item"><div class="activity-dot ad-grey"></div><div><strong>Joined TiE Bangalore</strong> — ₹10,000 + GST paid<br><span style="color:var(--mid);font-size:11px;">Annual membership activated · 18 days ago</span></div></div>
       </div>
     </div>
@@ -3270,7 +3345,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="admin-card">
         <div style="font-size:12px;font-weight:700;color:var(--grey);margin-bottom:8px;">Sample verdict (illustrative)</div>
         <table class="admin-table">
-          <thead><tr><th>Founder</th><th>Startup</th><th>Reviewer</th><th>Recommendation</th><th>Scores (all 4 dims)</th><th>Action</th></tr></thead>
+          <thead><tr><th>Founder</th><th>Startup</th><th>Reviewer</th><th>Recommendation</th><th>Scores (all 6 dims)</th><th>Action</th></tr></thead>
           <tbody>
             <tr>
               <td><strong>Priya Nair</strong></td>
@@ -3721,6 +3796,11 @@ function unflagConflict(founder, el){
       <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;">Pay for your expert review</h1>
       <p class="sub" style="margin-bottom:20px;">A one-time <strong>₹3,000 + GST</strong> for a TiE Charter Member to review your deck against the bar. Payment is handled securely by Razorpay.</p>
 
+      <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;padding:13px 15px;margin-bottom:20px;text-align:left;">
+        <div style="font-size:12px;font-weight:800;color:#6D28D9;margin-bottom:6px;">What the expert adds beyond your free AI read</div>
+        <div style="font-size:12.5px;color:var(--dark);line-height:1.6;">Your free AI read covered your <strong>positioning</strong> — 4 dimensions (Positioning Clarity, ICP Specificity, Messaging Hierarchy, GTM Sequencing). A TiE Charter Member scores all <strong>6 investor-readiness dimensions</strong>, adding the four an AI can't honestly judge — <strong>Market, Team, Traction and Unit Economics</strong> — with written human feedback and the VentureReady mark.</div>
+      </div>
+
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:6px;">What happens next</div>
         <div style="font-size:13px;color:var(--dark);line-height:1.7;">
@@ -4053,33 +4133,45 @@ function loginRoute(){
 }
 // BARS anchors per dimension per tier (Tier 1 = best … Tier 4 = weakest)
 var TIER_DESC = {
-  positioning: {
-    1:'problem, named buyer and a validated "why now" — differentiation proven, not just claimed',
-    2:'clear problem, named buyer, differentiation claimed (needs validation)',
-    3:'problem stated but the buyer is vague, or differentiation is just a feature claim',
-    4:'leads with the product; no clear problem or buyer'},
-  icp: {
-    1:'company size + role + trigger event + can name 3 real example companies',
-    2:'company size and role defined, with a plausible trigger event (examples not yet named)',
-    3:'a segment named (e.g. "SMEs") but no role, trigger or firmographics',
-    4:'target is "everyone" — undefined'},
-  messaging: {
-    1:'one hero message, right proof points, and it holds up under an investor’s probing',
-    2:'hero message present, right proof points, no internal contradiction',
-    3:'several equally-weighted messages; the main one does not stand out',
-    4:'a feature list with no hierarchy; contradictory claims across slides'},
-  gtm: {
-    1:'first-10 plan proven, CAC evidenced, motion repeatable and already sequenced',
-    2:'first 10 customer plan exists, CAC stated, motion is repeatable',
-    3:'some channels named but no first-10 plan or CAC',
-    4:'"word of mouth and partnerships" — no first-10 plan'}
+  problem: {
+    1:'an urgent, must-have problem; who feels it and the cost of the status quo are quantified, with a proven "why now"',
+    2:'an urgent, must-have problem; clear who feels it and what the status quo costs them',
+    3:'a real problem, but urgency is asserted, not shown — reads as a nice-to-have',
+    4:'no clear problem, or a solution in search of one'},
+  market: {
+    1:'real addressable spend now, sized bottom-up, with clear timing and where you sit in it',
+    2:'real addressable spend happening now (not just a big future TAM); timing understood',
+    3:'a big top-down TAM, but unclear whether the spend is happening now or years away',
+    4:'market is asserted with no sizing or timing'},
+  differentiation: {
+    1:'a structural, hard-to-copy edge, proven against the real alternative buyers use today',
+    2:'a specific edge vs the real alternative buyers use today (claimed, needs validation)',
+    3:'differentiation is a feature claim ("faster/cheaper") a rival can copy',
+    4:'no differentiation, or "we\'re the only ones" with nothing behind it'},
+  team: {
+    1:'outstanding founder-market fit, complementary skills, and a track record of shipping or selling together',
+    2:'relevant founder-market fit and complementary (not overlapping) skills shown',
+    3:'a capable team but thin on domain fit or complementarity',
+    4:'team is unclear, or all overlapping skills with no relevant experience'},
+  traction: {
+    1:'strong, retained proof — revenue, retained usage or signed contracts, trending up',
+    2:'real early proof — paying customers, retained usage or signed LOIs (not just interest)',
+    3:'only pilots or "growing interest"; nothing retained or paid',
+    4:'no evidence anyone wants this yet'},
+  unit: {
+    1:'healthy per-customer economics proven, with a clear path to strong margins at scale',
+    2:'revenue per customer shown with a credible path to a healthy margin at scale',
+    3:'top-line only; per-customer economics or cost to serve/acquire not shown',
+    4:'no unit economics, or the numbers do not add up'}
 };
 function _dimKey(row){
   var t=((row.querySelector('.rubric-dim')||{}).textContent||'').toLowerCase();
-  if(t.indexOf('icp')>=0) return 'icp';
-  if(t.indexOf('messag')>=0) return 'messaging';
-  if(t.indexOf('gtm')>=0) return 'gtm';
-  return 'positioning';
+  if(t.indexOf('market')>=0) return 'market';
+  if(t.indexOf('different')>=0) return 'differentiation';
+  if(t.indexOf('team')>=0) return 'team';
+  if(t.indexOf('traction')>=0) return 'traction';
+  if(t.indexOf('unit')>=0 || t.indexOf('econ')>=0) return 'unit';
+  return 'problem';
 }
 // Show the full tier ladder for a dimension: green ✓ = pass (Tier 1–2), red ✗ = fail (Tier 3–4); selected row highlighted.
 function renderTierSummary(row){
@@ -4113,7 +4205,7 @@ window.addEventListener('load',function(){
 function updateMarkEligibility(card){
   const banner=card.querySelector('.mark-eligibility');
   if(!banner) return;
-  const names=['Positioning Clarity','ICP Specificity','Messaging Hierarchy','GTM Sequencing'];
+  const names=['Problem','Market','Differentiation','Team','Traction','Unit Economics'];
   const rows=card.querySelectorAll('.rubric-row');
   // Lower tier number = better. Pass = every dimension at Tier 1 or 2; the "gap" is the worst (highest) tier.
   let maxTier=0, gapDim='A dimension';
@@ -4346,17 +4438,18 @@ function downloadCertificate(){
     + '@media print{.no-print{display:none}.wrap{border-color:#C8202A}}'
     + '</style></head><body><div class="wrap">'
     + '<div class="eyebrow">VentureReady by TiE Bangalore</div>'
-    + '<h1>Certificate of Validated Positioning</h1>'
+    + '<h1>Certificate of Investor Readiness</h1>'
     + '<div class="sub">This certifies that</div>'
     + '<div class="co">'+co+'</div><div style="color:#666;font-size:14px;">'+name+'</div>'
     + '<div class="rule"></div>'
     + '<div class="body">has been reviewed by a TiE-vetted expert against the VentureReady rubric and has met or exceeded '
-    + 'the required standard on all four positioning dimensions.</div>'
+    + 'the required standard on all six investor-readiness dimensions.</div>'
     + '<div class="dims">'
-    + '<div class="dim"><b>Tier 2</b>Positioning Clarity</div><div class="dim"><b>Tier 1</b>ICP Specificity</div>'
-    + '<div class="dim"><b>Tier 2</b>Messaging Hierarchy</div><div class="dim"><b>Tier 2</b>GTM Sequencing</div></div>'
+    + '<div class="dim"><b>Tier 2</b>Problem</div><div class="dim"><b>Tier 2</b>Market</div>'
+    + '<div class="dim"><b>Tier 1</b>Differentiation</div><div class="dim"><b>Tier 2</b>Team</div>'
+    + '<div class="dim"><b>Tier 2</b>Traction</div><div class="dim"><b>Tier 2</b>Unit Economics</div></div>'
     + '<div class="foot">Issued '+issued+' · Countersigned by TiE Bangalore<br>'
-    + 'This mark reflects positioning reviewed at a point in time. It is not investment advice and is not a guarantee of funding.</div>'
+    + 'This mark reflects investor readiness reviewed at a point in time. It is not investment advice and is not a guarantee of funding.</div>'
     + '<div class="no-print" style="margin-top:30px;"><button onclick="window.print()" style="background:#C8202A;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;">Print / Save as PDF</button></div>'
     + '</div></body></html>');
   w.document.close();
@@ -4379,8 +4472,8 @@ var _FB_SAMPLE_DIAG = {
 var _FB_SAMPLE_EXPERT = {
   reviewer: 'Rajan Kumar · TiE Reviewer, ex-VP Sales at Freshworks',
   verdict: 'awarded',
-  note: "Strong ICP specificity and a clear 90-day outcome anchor. The founder validated their ‘only platform’ claim with a reference customer since the last review — this pitch is ready for institutional conversations.",
-  tiers: [['Positioning Clarity','Tier 2'],['ICP Specificity','Tier 1'],['Messaging Hierarchy','Tier 2'],['GTM Sequencing','Tier 2']]
+  note: "A genuinely urgent problem, a credible team, and a clear per-customer economic story. The founder validated their ‘only platform’ claim with a reference customer since the last review — this pitch is ready for institutional conversations.",
+  tiers: [['Problem','Tier 2'],['Market','Tier 2'],['Differentiation','Tier 1'],['Team','Tier 2'],['Traction','Tier 2'],['Unit Economics','Tier 2']]
 };
 function _fbVerdictBadge(v){
   v = String(v||'').toLowerCase();
@@ -4411,7 +4504,7 @@ async function downloadFeedbackPDF(role){
     var hEl = scope.querySelector('h1');
     var parts = (hEl ? hEl.textContent : 'Stackr — Rohan Verma').split('—');
     company = (parts[0]||'Stackr').trim(); founder = (parts[1]||'').trim();
-    var DIMS=['Positioning Clarity','ICP Specificity','Messaging Hierarchy','GTM Sequencing'], rtiers=[];
+    var DIMS=['Problem','Market','Differentiation','Team','Traction','Unit Economics'], rtiers=[];
     scope.querySelectorAll('.rubric-row').forEach(function(row,i){
       var sel=row.querySelector('.tier-btn.selected');
       if(sel) rtiers.push([DIMS[i]||('Dimension '+(i+1)), 'Tier '+sel.textContent.replace(/\D/g,'')]);
@@ -4517,7 +4610,7 @@ async function downloadFeedbackPDF(role){
     H.push(expBody);
   }
   H.push('</div>');
-  H.push('<div class="disc">This report combines an automated AI diagnostic with an expert review. Tiers run 1 (top) to 4; Tier 2 or better on every dimension is required to earn the mark. The VentureReady mark reflects positioning reviewed at a point in time. It is not investment advice and is not a guarantee of funding.</div>');
+  H.push('<div class="disc">This report combines an automated AI diagnostic with an expert review. Tiers run 1 (top) to 4; Tier 2 or better on every dimension is required to earn the mark. The VentureReady mark reflects investor readiness reviewed at a point in time. It is not investment advice and is not a guarantee of funding.</div>');
   H.push('<div class="no-print" style="margin-top:22px;"><button onclick="window.print()" style="background:#C8202A;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;">Print / Save as PDF</button></div>');
   H.push('</div></div></body></html>');
   w.document.write(H.join(''));
@@ -4537,7 +4630,7 @@ function downloadInvoice(){
 // policy must come from TiE's counsel. These pages state that honestly and list
 // the scope counsel has to cover, so the links aren't dead and nothing is missed.
 var TERMS_SCOPE = [
-  ['What VentureReady is — and is not', 'That the mark reflects positioning reviewed at a point in time; it is not investment advice, not a guarantee of funding, and not a substitute for an investor\'s own due diligence.'],
+  ['What VentureReady is — and is not', 'That the mark reflects investor readiness reviewed at a point in time; it is not investment advice, not a guarantee of funding, and not a substitute for an investor\'s own due diligence.'],
   ['Eligibility & accounts', 'Who may register, TiE membership requirements per role, and that accounts are personal and non-transferable.'],
   ['Fees, GST & refunds', 'The ₹3,000 + GST expert review (with one free re-review), ₹10,000 + GST membership, ₹35,000 + GST investor access; what is refundable, and that the review fee is not a credit toward membership.'],
   ['Reviews & the mark', 'That verdicts are expert judgement on a defined rubric, that "Not Yet" is a valid outcome, TiE\'s countersignature right, and TiE\'s discretion to withdraw the mark.'],
@@ -4627,7 +4720,7 @@ async function adminAct(btn, action){
         await fetch('/api/review', {method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({founder_id: window._founderId, verdict:'awarded', gaps: [],
             reviewer:'TiE Admin countersignature',
-            note:'Countersigned by TiE Ops — all four dimensions at Tier 2 or better.'})});
+            note:'Countersigned by TiE Ops — all six dimensions at Tier 2 or better.'})});
       }catch(e){ done = 'Mark issued (not saved — server offline)'; }
     }
     _admResolve(row, done, 'badge-approved');
@@ -4639,8 +4732,8 @@ async function adminAct(btn, action){
 // Most founders don't clear the bar first time, so this is the majority journey,
 // not an error state. The free/paid rule is enforced server-side (/api/review).
 var SAMPLE_GAPS = [
-  {dim:'ICP Specificity', tier:'Tier 3', note:'The buyer is described as a category, not a person who signs. No firmographic qualifier or trigger event.'},
-  {dim:'GTM Sequencing', tier:'Tier 3', note:'No first-10-customers plan — acquisition rests on partnerships that aren\'t yet evidenced.'}
+  {dim:'Traction', tier:'Tier 3', note:'Early interest is described, but there are no paying customers, retained usage or signed LOIs yet — only pilots.'},
+  {dim:'Unit Economics', tier:'Tier 3', note:'No per-customer economics — revenue per account, cost to serve and cost to acquire aren\'t shown.'}
 ];
 
 async function _reviewState(){
@@ -4684,7 +4777,7 @@ async function submitVerdict(verdict){
   }
   var note = verdict==='not_yet'
     ? 'Strong team and a real wedge — but the buyer and the route to them still aren\'t specific enough to put in front of investors.'
-    : 'Cleared the bar on all four dimensions. Ready for institutional conversations.';
+    : 'Cleared the bar on all six dimensions. Ready for institutional conversations.';
   try{
     var r = await fetch('/api/reviewer/submit',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({reviewer_email:window._reviewerEmail, founder_id:founderId,
@@ -6089,11 +6182,11 @@ async function countersign(reviewId, decision, btn){
 // ── First-run walkthrough (role-aware onboarding) ───────────────────────────
 var ONBOARDING = {
   founder: { eyebrow:'Your founder journey', steps:[
-    {icon:'', title:'Start with a free diagnostic', body:'Upload your deck and our AI reads your positioning, ICP, messaging and go-to-market in minutes. It\'s free — you don\'t even need an account to try it.'},
+    {icon:'', title:'Start with a free diagnostic', body:'Upload your deck and our AI reads your positioning — positioning clarity, ICP, messaging and go-to-market — in minutes. It\'s free — you don\'t even need an account to try it.'},
     {icon:'', title:'Unlock expert review', body:'Join TiE Bangalore (Associate membership) or pay for a one-time expert review, so a real TiE Charter Member assesses your deck against the bar.'},
-    {icon:'', title:'Complete the questionnaire', body:'Answer structured questions on your positioning, ICP, differentiation and GTM — so your reviewer works from the same picture you do.'},
+    {icon:'', title:'Complete the questionnaire', body:'Answer structured questions on your problem, market, differentiation, team, traction and unit economics — so your reviewer works from the same picture you do.'},
     {icon:'', title:'Get your verdict', body:'Most founders get a "Not Yet" first — with a clear list of gaps to close and one free re-review. It\'s a path, not a rejection.'},
-    {icon:'', title:'Earn the mark, get discovered', body:'Clear all four dimensions and, once TiE countersigns, you earn the VentureReady mark — and screened investors can find you.'},
+    {icon:'', title:'Earn the mark, get discovered', body:'Clear all six dimensions and, once TiE countersigns, you earn the VentureReady mark — and screened investors can find you.'},
     {icon:'', title:'Track your conversations', body:'Keep each investor conversation updated on your profile. It\'s how TiE measures the real impact your mark creates.'}
   ]},
   investor: { eyebrow:'Your investor journey', steps:[
@@ -6107,7 +6200,7 @@ var ONBOARDING = {
   reviewer: { eyebrow:'Your reviewer journey', steps:[
     {icon:'', title:'Welcome, Charter Member', body:'As a TiE Charter Member, you bring the senior judgment that makes the VentureReady mark actually mean something.'},
     {icon:'', title:'See your assigned decks', body:'TiE assigns you founders to review. They appear on your dashboard the moment they\'re assigned to your email — nobody else\'s.'},
-    {icon:'', title:'Score the rubric', body:'Work from the AI prep packet and score four dimensions — positioning, ICP, messaging and GTM — against the tier bar.'},
+    {icon:'', title:'Score the rubric', body:'Work from the AI prep packet and score six dimensions — problem, market, differentiation, team, traction and unit economics — against the tier bar.'},
     {icon:'', title:'Submit your verdict', body:'A "Not Yet" goes to the founder as coaching. Recommending the mark sends it to TiE — you recommend, TiE countersigns before it goes live.'},
     {icon:'', title:'Grow your reviewer title', body:'Your completed reviews build your title over time, from Assessor through to Chief Validator.'}
   ]},
@@ -6192,6 +6285,16 @@ async function reviewerSignup(){
 function _initials(name){
   var p=(name||'').trim().split(/\s+/);
   return (((p[0]||'')[0]||'')+((p[p.length-1]||'')[0]||'')).toUpperCase() || 'TR';
+}
+async function reviewerDemo(){
+  _rvErr('');
+  try{
+    var r=await fetch('/api/reviewer/demo',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    var out=await r.json();
+    if(out.error){ _rvErr(out.error); return; }
+    _applyReviewer(out.reviewer);
+  }catch(e){ _rvErr('Could not reach the server. Please try again.'); return; }
+  loggedInAs='reviewer'; go('reviewer-dashboard');
 }
 function _applyReviewer(rec){
   if(!rec) return;
@@ -6467,6 +6570,16 @@ function renderDiagnostic(d){
     findEl.innerHTML = '';
     return;
   }
+  if(d && d.capped){
+    if(dlEl) dlEl.style.display = 'none';
+    modeEl.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#D97706;display:inline-block;"></span> Free reads used up for now';
+    modeEl.style.background = '#fef3c7'; modeEl.style.color = '#92400e';
+    sumEl.innerHTML =
+      '<div style="font-size:14.5px;line-height:1.6;">' + _esc((d && d.summary) ? d.summary : '') + '</div>'
+      + '<div style="margin-top:14px;"><button class="btn btn-red" onclick="go(\'artifacts\')">Submit for expert review →</button></div>';
+    findEl.innerHTML = '';
+    return;
+  }
   if(d && d.live){
     modeEl.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#16A34A;display:inline-block;"></span> Live AI · read on your deck';
     modeEl.style.background = '#dcfce7'; modeEl.style.color = '#15803d';
@@ -6554,10 +6667,83 @@ function populateReviewerReview(){
       + (probe ? ' <span style="color:rgba(255,255,255,.5);">Probe:</span> ' + _esc(probe) : '')
       + '</div></div>';
   }).join('');
-  var ps = document.getElementById('rev-q-positioning');
-  var ic = document.getElementById('rev-q-icp');
-  if(ps && fs.pitch) ps.textContent = fs.pitch;
-  if(ic && fs.icp)   ic.textContent = fs.icp;
+  // Surface the founder's real free-step inputs against the matching dimensions.
+  var probEl = document.getElementById('rev-q-problem');
+  if(probEl && (fs.pitch || fs.icp)){
+    probEl.textContent = [fs.pitch, fs.icp ? ('Who it’s for: ' + fs.icp) : ''].filter(Boolean).join(' — ');
+  }
+}
+
+// ── Stage-aware answer prompts ──────────────────────────────────────────────
+// The six questions are the same at every stage, but the KIND of answer that's
+// credible changes. When the founder picks their stage, each question's prompt
+// shifts to the answer type that fits — a hypothesis at pre-seed, hard metrics
+// later. Placeholders only show while a field is empty, so this never overwrites
+// anything the founder has typed.
+var STAGE_PROMPTS = {
+  idea: {
+    problem: "Answer type: customer-discovery evidence, not assumptions. e.g. 'Interviewed 30 ops leads; 22 named this exact pain unprompted and cope with spreadsheets today.'",
+    market: "Answer type: a bottom-up size estimate + why now. e.g. '~50k firms like this, each spending ₹X on the workaround; a recent shift makes them ready now.'",
+    diff: "Answer type: the edge you're building and why it will be hard to copy. e.g. 'Alternatives do X; our angle is Y, defensible because Z.'",
+    team: "Answer type: founder-market fit — why you, for this problem. e.g. 'Six years in this industry; I hit this exact wall myself.'",
+    traction: "Answer type: discovery signal — interviews, letters of intent, a waitlist. e.g. '40 interviews, 8 LOIs of intent, 300 on the waitlist.'",
+    economics: "Answer type: your pricing hypothesis + the assumptions behind it. e.g. 'Plan to charge ₹X; comparable tools charge ₹Y; assume CAC ~one quarter's revenue.'"
+  },
+  pre_seed: {
+    problem: "Answer type: the specific pain, who feels it, and early signal it's a must-have. e.g. 'Design partners say they'd pay today to stop losing X.'",
+    market: "Answer type: today's addressable spend, the 'why now' trigger, and your entry point. e.g. 'Reachable SAM ₹X; trigger is a new regulation; we enter via segment Y.'",
+    diff: "Answer type: the specific alternative today and your defensible angle. e.g. 'Vs tool A we win on Y; the moat is our Z.'",
+    team: "Answer type: complementary skills and what you've built or sold together. e.g. 'Technical + domain co-founders; shipped a prior product to 40 users.'",
+    traction: "Answer type: design partners, pilots, or a waitlist and its growth. e.g. '2 unpaid pilots live, 3 design partners, waitlist +25%/mo.'",
+    economics: "Answer type: expected deal size, target margin, and comparable pricing. e.g. '₹6–8L/yr expected; ~75% target gross margin; peers price similarly.'"
+  },
+  seed: {
+    problem: "Answer type: the pain, its cost, and that early users confirm it's urgent. e.g. 'Users cite ₹X lost; first customers bought within a week of trying.'",
+    market: "Answer type: SAM you can reach now, timing, and where you sit vs competitors. e.g. 'Reachable SAM ₹X; early in phase two; ahead of A/B on Y.'",
+    diff: "Answer type: early proof the edge wins — pilots, head-to-heads. e.g. 'Won 3 of 4 competitive evaluations on Y.'",
+    team: "Answer type: founder-market fit plus your key early hires. e.g. 'Domain founders + first two senior engineers from the space.'",
+    traction: "Answer type: first paying customers, early revenue, and retention. e.g. '11 paying teams, ₹42L ARR in 7 months, 92% retained.'",
+    economics: "Answer type: early ACV, gross margin, and initial CAC. e.g. 'ACV ₹8L; ~80% gross margin; CAC ~₹1.2L and improving.'"
+  },
+  series_a: {
+    problem: "Answer type: the validated problem and how usage proves its urgency. e.g. 'Daily active use; churn spikes when the pain isn't solved.'",
+    market: "Answer type: proven wedge, expansion path, and market timing. e.g. 'Won the beachhead; expanding into adjacent segment X.'",
+    diff: "Answer type: win rates vs named competitors and why the moat deepens. e.g. '70% win rate vs A; the moat compounds with our data.'",
+    team: "Answer type: leadership depth and the gaps this round fills. e.g. 'VPs of Sales and Eng in seat; hiring a CFO with this raise.'",
+    traction: "Answer type: ARR, growth rate, retention cohorts, and CAC. e.g. '₹6Cr ARR, 3x YoY, 115% net revenue retention, CAC payback 9 months.'",
+    economics: "Answer type: CAC, LTV, payback period, and gross margin. e.g. 'LTV:CAC 4:1, payback 9 months, 82% gross margin.'"
+  },
+  series_b_plus: {
+    problem: "Answer type: the problem at scale and how retention proves it stays urgent. e.g. 'Enterprise-wide adoption; 120% NRR shows a durable need.'",
+    market: "Answer type: category position, share, and adjacent expansion. e.g. 'Top-3 in category; ~8% share; expanding into X.'",
+    diff: "Answer type: durable moat evidence — retention, switching costs, data. e.g. '95% gross retention; deep integrations raise switching cost.'",
+    team: "Answer type: org strength and a track record of execution. e.g. 'Full exec bench; hit plan seven quarters running.'",
+    traction: "Answer type: scale metrics — NRR, efficiency, and the growth trend. e.g. '₹80Cr ARR, 130% NRR, magic number 1.2.'",
+    economics: "Answer type: cohort economics and contribution margin at scale. e.g. 'Cohorts pay back in under 12 months; 70% contribution margin.'"
+  },
+  bootstrapped: {
+    problem: "Answer type: the pain customers already pay you to solve. e.g. 'Customers renew because the alternative costs them ₹X.'",
+    market: "Answer type: the profitable niche and the room to expand. e.g. 'We own niche X profitably; ₹Y adjacent still open.'",
+    diff: "Answer type: why customers pick you and stay over alternatives. e.g. 'They stay for Y; churn is under Z%.'",
+    team: "Answer type: the lean team and how it punches above its weight. e.g. '6 people, ₹Xcr revenue, no outside capital.'",
+    traction: "Answer type: revenue, profitability, and growth without outside capital. e.g. '₹5Cr revenue, profitable, 60% YoY, self-funded.'",
+    economics: "Answer type: real margins, payback, and cash efficiency. e.g. '75% gross margin, CAC payback 4 months, cash-flow positive.'"
+  }
+};
+var _qDefaults = null;
+function applyStagePrompts(){
+  var ids = {problem:'q-problem', market:'q-market', diff:'q-diff', team:'q-team', traction:'q-traction', economics:'q-economics'};
+  if(!_qDefaults){
+    _qDefaults = {};
+    for(var d in ids){ var e0 = document.getElementById(ids[d]); _qDefaults[d] = e0 ? e0.placeholder : ''; }
+  }
+  var stage = (document.getElementById('q-stage') || {}).value || '';
+  var set = STAGE_PROMPTS[stage];
+  for(var k in ids){
+    var el = document.getElementById(ids[k]);
+    if(!el) continue;
+    el.placeholder = (set && set[k]) ? set[k] : _qDefaults[k];
+  }
 }
 
 // Founder artifacts page: surface the real AI read in the insight box.

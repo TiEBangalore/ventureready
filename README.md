@@ -69,6 +69,7 @@ git-ignored and must never be committed.
 | `GOOGLE_CLIENT_ID` | "Continue with Google" sign-in (public OAuth Client ID from Google Cloud Console). Add your app's URL as an Authorized JavaScript origin. | Google button falls back to the demo sign-in |
 | `ANTHROPIC_API_KEY` | Live AI positioning diagnostic (Claude) | Falls back to a canned sample result |
 | `ANTHROPIC_MODEL` | Optional — pin a specific Claude model | Uses the default model |
+| `FOUNDER_DIAGNOSTIC_CAP` / `FOUNDER_DIAGNOSTIC_WINDOW_DAYS` | Abuse control — how many **fresh** (paid) AI reads one founder may run per rolling window. Re-running the identical deck is free (cached) and never counts. | Defaults to 2 reads per 30 days; set the cap to 0 to disable |
 | `TIE_MEMBERSHIP_URL` | TiE Bangalore's membership page. Membership is **not** paid for in this app — the "Join TiE Bangalore" buttons hand off to this URL, and the app then re-checks membership against Zoho. Founders pick "Associate Membership" (₹10,000 + GST/yr) there. | Join buttons are hidden; founders are told to email admin.blr@tiebangalore.org |
 | `EXPERT_REVIEW_PAYMENT_URL` | Razorpay payment link for the one-time expert review (₹3,000 + GST). Payment happens **on Razorpay** — the button hands off to this link and records the intent so admins can reconcile it in the Razorpay dashboard. | Falls back to the in-app demo checkout |
 | `ADMIN_EMAILS` | First-run **seed** of extra admin emails for the Team Portal (comma-separated). After first run the list is managed in-app by a super-admin. | Only the super-admins can sign in |

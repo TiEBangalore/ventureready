@@ -1,0 +1,5 @@
+# Real portfolio decks and their outcomes are private — never commit them.
+decks/
+results.csv
+scorecard.md
+outcomes.csv
