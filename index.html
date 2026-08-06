@@ -1297,7 +1297,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
               <option value="seed">Seed</option>
               <option value="series_a">Series A</option>
               <option value="series_b_plus">Series B or later</option>
-              <option value="bootstrapped">Bootstrapped / revenue-funded</option>
             </select>
             <div style="font-size:11px;color:var(--grey);margin-top:8px;line-height:1.6;">Your reviewer weights the six dimensions by your stage — at pre-seed, <strong>Problem</strong> and <strong>Team</strong> carry more than <strong>Traction</strong>, and answers can be well-reasoned hypotheses. At later stages, evidence and <strong>Unit Economics</strong> carry more.</div>
           </div>
@@ -1373,6 +1372,53 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <label>What do the economics of a single customer look like? If you have revenue, show the real numbers; if you're pre-revenue, give your pricing hypothesis and the assumptions behind it.</label>
             <textarea id="q-economics" rows="3" placeholder="Pre-revenue — e.g. planned ₹6–8L/yr per customer; comparable tools charge ₹5–10L; we expect CAC to land near one quarter's revenue and gross margin ~75% once onboarding is self-serve.&#10;With revenue — e.g. ₹8L/yr per team; CAC ~₹1.2L (payback under 3 months); gross margin ~82%."></textarea>
           </div>
+        </div>
+
+        <!-- Section 7: Deal & Risk (investor due-diligence facts) -->
+        <div style="margin-bottom:32px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
+            <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">7</div>
+            <div style="font-size:14px;font-weight:800;">Deal &amp; Risk <span style="font-weight:600;color:var(--grey);font-size:12px;">— the facts investors screen on</span></div>
+          </div>
+          <div class="form-group">
+            <label>Use of funds — what does this raise buy?</label>
+            <textarea id="q-usefunds" rows="2" placeholder="e.g. 40% product & tech, 30% team, 20% go-to-market, 10% compliance."></textarea>
+          </div>
+          <div class="upload-grid">
+            <div class="form-group">
+              <label>Revenue stage</label>
+              <select id="q-revstage" onchange="renderRiskSnapshot()"><option value="pre">Pre-revenue</option><option value="post">Post-revenue</option></select>
+            </div>
+            <div class="form-group">
+              <label>Monthly revenue run-rate <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(if post-revenue)</span></label>
+              <div style="display:flex;gap:8px;"><select class="cur-select" id="q-runrate-cur" onchange="renderRiskSnapshot()" style="flex:0 0 auto;max-width:42%;padding:11px 8px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:#fff;"></select><input id="q-runrate" oninput="renderRiskSnapshot()" type="text" placeholder="e.g. 1.5 Cr" style="flex:1;" /></div>
+            </div>
+          </div>
+          <div class="upload-grid">
+            <div class="form-group">
+              <label>Current debt liability</label>
+              <div style="display:flex;gap:8px;"><select class="cur-select" id="q-debt-cur" style="flex:0 0 auto;max-width:42%;padding:11px 8px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:#fff;"></select><input id="q-debt" type="text" placeholder="e.g. 0 — or 2 Cr" style="flex:1;" /></div>
+            </div>
+            <div class="form-group">
+              <label>Target revenue &amp; timeline</label>
+              <input id="q-target" type="text" placeholder="e.g. ₹200 Cr by FY30" />
+            </div>
+          </div>
+          <div class="upload-grid">
+            <div class="form-group">
+              <label>Expected investor return</label>
+              <input id="q-return" type="text" placeholder="e.g. 3.9x MOIC / 40% IRR over 5 yrs" />
+            </div>
+            <div class="form-group">
+              <label>Existing investors / cap table</label>
+              <input id="q-investors" type="text" placeholder="e.g. Seed led by a credible fund; 2 angels" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Team track record — prior growth journeys</label>
+            <input id="q-track" type="text" placeholder="e.g. Co-founder scaled a prior startup from ₹8 Cr to ₹100 Cr." />
+          </div>
+          <div id="risk-snapshot" style="margin-top:4px;"></div>
         </div>
 
         <div style="display:flex;justify-content:flex-end;gap:12px;">
@@ -2214,6 +2260,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div class="pscore"><div class="pscore-val" id="prof-t6">Tier 2 ✓</div><div class="pscore-lbl">Unit Economics</div></div>
     </div>
     <div style="font-size:12px;color:var(--dark);line-height:1.55;margin:0 0 14px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 13px;"><strong style="color:#047857;">Human-validated.</strong> Every VentureReady mark is awarded by a TiE Charter Member who scored this founder across all 6 investor-readiness dimensions — not an AI. The AI handles only the first-pass positioning read.</div>
+    <div id="investor-risk-strip" style="margin:0 0 24px;"></div>
     <div style="font-size:11.5px;color:var(--grey);line-height:1.6;margin:-4px 0 24px;background:#F9FAFB;border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
       <span style="font-weight:700;color:var(--dark);">What the tiers mean.</span> A TiE expert scores each dimension on a 1&#8211;4 ladder where <strong>Tier&nbsp;1 is the top</strong> (lower is better). <span style="color:var(--green);font-weight:700;">Tier&nbsp;2</span> is the bar to earn the VentureReady mark.
       <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;">
@@ -4381,7 +4428,7 @@ function openInvestorBio(idx){
 // updates together. Keep the original labels (B2B SaaS, Seed, etc.) unchanged so
 // existing records and the investor directory keep matching.
 const FUNDING_STAGES = [
-  'Bootstrapped','Angel','Pre-seed','Seed','Pre-Series A (Bridge)',
+  'Angel','Pre-seed','Seed','Pre-Series A (Bridge)',
   'Series A','Series B','Series C','Series D','Series E+','Growth / Pre-IPO'
 ];
 const INDUSTRIES = [
@@ -6789,14 +6836,6 @@ var STAGE_PROMPTS = {
     team: "Answer type: org strength and a track record of execution. e.g. 'Full exec bench; hit plan seven quarters running.'",
     traction: "Answer type: scale metrics — NRR, efficiency, and the growth trend. e.g. '₹80Cr ARR, 130% NRR, magic number 1.2.'",
     economics: "Answer type: cohort economics and contribution margin at scale. e.g. 'Cohorts pay back in under 12 months; 70% contribution margin.'"
-  },
-  bootstrapped: {
-    problem: "Answer type: the pain customers already pay you to solve. e.g. 'Customers renew because the alternative costs them ₹X.'",
-    market: "Answer type: the profitable niche and the room to expand. e.g. 'We own niche X profitably; ₹Y adjacent still open.'",
-    diff: "Answer type: why customers pick you and stay over alternatives. e.g. 'They stay for Y; churn is under Z%.'",
-    team: "Answer type: the lean team and how it punches above its weight. e.g. '6 people, ₹Xcr revenue, no outside capital.'",
-    traction: "Answer type: revenue, profitability, and growth without outside capital. e.g. '₹5Cr revenue, profitable, 60% YoY, self-funded.'",
-    economics: "Answer type: real margins, payback, and cash efficiency. e.g. '75% gross margin, CAC payback 4 months, cash-flow positive.'"
   }
 };
 var _qDefaults = null;
@@ -6814,6 +6853,111 @@ function applyStagePrompts(){
     el.placeholder = (set && set[k]) ? set[k] : _qDefaults[k];
   }
 }
+
+// ── Deal & Risk (investor DD, Phase 1) ──────────────────────────────────────
+// OBJECTIVE, rule-based flags only. Whether growth/returns are *credible* is the
+// human expert reviewer's judgment — never automated (per Saumil Sheth's steer).
+var CURRENCIES=[['INR','₹'],['USD','$'],['EUR','€'],['GBP','£'],['AED','د.إ'],['AUD','A$'],['BDT','৳'],['BRL','R$'],['CAD','C$'],['CHF','Fr'],['CNY','¥'],['DKK','kr'],['EGP','E£'],['HKD','HK$'],['IDR','Rp'],['ILS','₪'],['JPY','¥'],['KES','KSh'],['KRW','₩'],['LKR','Rs'],['MXN','Mex$'],['MYR','RM'],['NGN','₦'],['NOK','kr'],['NPR','रू'],['NZD','NZ$'],['PHP','₱'],['PKR','₨'],['PLN','zł'],['QAR','﷼'],['RUB','₽'],['SAR','﷼'],['SEK','kr'],['SGD','S$'],['THB','฿'],['TRY','₺'],['TWD','NT$'],['VND','₫'],['ZAR','R']];
+function populateCurrencySelects(){
+  document.querySelectorAll('select.cur-select').forEach(function(sel){
+    if(sel.dataset.filled) return; sel.dataset.filled='1';
+    CURRENCIES.forEach(function(c){ var o=document.createElement('option'); o.value=c[0]; o.textContent=c[0]+' ('+c[1]+')'; if(c[0]==='INR') o.selected=true; sel.appendChild(o); });
+  });
+}
+function _parseAmt(s){
+  if(s==null) return null;
+  s=String(s).toLowerCase().replace(/rs\.?/g,'').replace(/[₹$,€£\s]/g,'');
+  if(!s) return null;
+  var m=s.match(/^([0-9]*\.?[0-9]+)\s*(cr|crore|lakh|lac|l|k|mn|m|bn|b)?/);
+  if(!m) return null;
+  var n=parseFloat(m[1]); if(isNaN(n)) return null;
+  var u=m[2]||'';
+  if(u==='cr'||u==='crore') n*=1e7; else if(u==='lakh'||u==='lac'||u==='l') n*=1e5;
+  else if(u==='k') n*=1e3; else if(u==='mn'||u==='m') n*=1e6; else if(u==='bn'||u==='b') n*=1e9;
+  return n;
+}
+var RISK_BENCHMARK_INR=15000000; // ₹1.5 Cr / month (Saumil's traction signal)
+function computeRisk(inp){
+  var flags=[], signals=[], tier='Lower';
+  var stage=(inp.fundingStage||'').toLowerCase();
+  var sl={idea:'Idea',pre_seed:'Pre-seed',seed:'Seed',series_a:'Series A',series_b_plus:'Series B+'}[stage]||'this stage';
+  var post=inp.revstage==='post';
+  if(!post){
+    flags.push('Pre-revenue — automatically flagged higher risk.'); tier='High';
+    if(stage==='seed'||stage==='series_a'||stage==='series_b_plus') flags.push('Milestone gap: still pre-revenue at '+sl+' stage.');
+  } else {
+    var rr=_parseAmt(inp.runrate);
+    if((inp.runrateCur||'INR')==='INR' && rr!=null){
+      if(rr<RISK_BENCHMARK_INR){ flags.push('Below the ₹1.5 Cr/month traction benchmark — early traction.'); tier='Medium';
+        if(stage==='series_a'||stage==='series_b_plus') flags.push('Milestone gap: traction below expectation for '+sl+'.'); }
+      else signals.push('Established traction — at or above ₹1.5 Cr/month.');
+    } else if(rr!=null){ signals.push('Run-rate reported in '+(inp.runrateCur||'a non-INR currency')+' — the ₹1.5 Cr/mo benchmark is not auto-applied.'); }
+  }
+  var debt=_parseAmt(inp.debt), raise=_parseAmt(inp.raise);
+  if(debt!=null && raise!=null && (inp.debtCur||'INR')===(inp.raiseCur||'INR') && raise>0 && debt>0.5*raise){
+    flags.push('High leverage — current debt is a large share of the raise.'); if(tier==='Lower') tier='Medium';
+  }
+  if((inp.investors||'').trim()) signals.push('Existing backers on the cap table: '+inp.investors.trim());
+  if((inp.track||'').trim()) signals.push('Team track record: '+inp.track.trim());
+  return {tier:tier, flags:flags, signals:signals};
+}
+function _riskColors(t){ return t==='High'?['#B42318','#FEE2E2']:t==='Medium'?['#B45309','#FEF3C7']:['#047857','#ECFDF5']; }
+function renderRiskCard(el, risk, metrics, title){
+  if(!el) return;
+  var c=_riskColors(risk.tier), h='';
+  h+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.06);">';
+  // header
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">';
+  h+='<div style="display:flex;align-items:center;gap:9px;"><span style="width:9px;height:9px;border-radius:50%;background:'+c[0]+';flex-shrink:0;"></span><span style="font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dark);">'+_esc(title||'Risk & Returns')+'</span></div>';
+  h+='<span style="font-size:11.5px;font-weight:800;color:'+c[0]+';background:'+c[1]+';border:1px solid '+c[0]+'40;border-radius:20px;padding:4px 13px;white-space:nowrap;">'+risk.tier+' risk</span>';
+  h+='</div>';
+  // metrics as stat tiles (2x2)
+  var mrows=(metrics||[]).filter(function(m){return m[1];});
+  if(mrows.length){
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 18px 4px;">';
+    mrows.forEach(function(m){ h+='<div style="background:var(--surface);border-radius:8px;padding:10px 12px;"><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--grey);margin-bottom:3px;">'+_esc(m[0])+'</div><div style="font-size:14px;font-weight:800;color:var(--dark);line-height:1.2;">'+_esc(m[1])+'</div></div>'; });
+    h+='</div>';
+  }
+  // flags + signals
+  h+='<div style="padding:12px 18px 6px;">';
+  if((risk.flags||[]).length){
+    h+='<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#B42318;margin-bottom:7px;">Risk flags</div>';
+    risk.flags.forEach(function(f){ h+='<div style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--dark);margin-bottom:6px;line-height:1.45;"><span style="width:17px;height:17px;border-radius:50%;background:#FEE2E2;color:#B42318;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">!</span><span>'+_esc(f)+'</span></div>'; });
+  }
+  if((risk.signals||[]).length){
+    h+='<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#047857;margin:'+((risk.flags||[]).length?'12px':'0')+' 0 7px;">De-risking signals</div>';
+    risk.signals.forEach(function(s){ h+='<div style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--dark);margin-bottom:6px;line-height:1.45;"><span style="width:17px;height:17px;border-radius:50%;background:#DCFCE7;color:#047857;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">✓</span><span>'+_esc(s)+'</span></div>'; });
+  }
+  h+='</div>';
+  // footer disclaimer
+  h+='<div style="font-size:11px;color:var(--grey);line-height:1.5;padding:11px 18px;background:var(--surface);border-top:1px solid var(--border);"><strong style="color:var(--dark);">Objective, rule-based flags.</strong> Whether the growth and return projections are <em>credible</em> is the TiE expert reviewer’s call — not automated.</div>';
+  h+='</div>';
+  el.innerHTML=h;
+}
+function renderRiskSnapshot(){
+  var el=document.getElementById('risk-snapshot'); if(!el) return;
+  var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  var inp={ fundingStage:g('q-stage'), revstage:g('q-revstage'), runrate:g('q-runrate'), runrateCur:g('q-runrate-cur'),
+            debt:g('q-debt'), debtCur:g('q-debt-cur'), raise:g('raise-amount'), raiseCur:g('raise-currency'),
+            investors:g('q-investors'), track:g('q-track') };
+  var metrics=[['Revenue stage', inp.revstage==='post'?'Post-revenue':'Pre-revenue'],
+               ['Run-rate', inp.runrate?(inp.runrateCur+' '+inp.runrate+'/mo'):''],
+               ['Target', g('q-target')], ['Expected return', g('q-return')]];
+  renderRiskCard(el, computeRisk(inp), metrics, 'Risk snapshot — how investors will screen you');
+}
+function renderInvestorRisk(){
+  var el=document.getElementById('investor-risk-strip'); if(!el) return;
+  var inp={ fundingStage:'seed', revstage:'post', runrate:'3.5 L', runrateCur:'INR', debt:'0', debtCur:'INR',
+            raise:'6 Cr', raiseCur:'INR', investors:'Angel round + 1 micro-VC', track:'Founders sold a prior sales tool to 40 customers' };
+  var metrics=[['Raise','₹6 Cr'],['Revenue stage','Post-revenue · ₹3.5L/mo'],['Target','₹120 Cr by FY30'],['Expected return','~8x over 6 yrs']];
+  renderRiskCard(el, computeRisk(inp), metrics, 'Risk & Returns (objective read)');
+}
+window.addEventListener('load', function(){
+  populateCurrencySelects();
+  var q=document.getElementById('screen-interview');
+  if(q){ q.addEventListener('input', renderRiskSnapshot); q.addEventListener('change', renderRiskSnapshot); }
+  renderRiskSnapshot(); renderInvestorRisk();
+});
 
 // Founder artifacts page: surface the real AI read in the insight box.
 function populateArtifacts(){
