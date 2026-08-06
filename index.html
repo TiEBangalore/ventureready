@@ -945,10 +945,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <!-- Prototype demo shortcuts -->
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mid);margin-bottom:8px;text-align:center;">Prototype demo shortcuts</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <button class="btn btn-red" onclick="demoFounder()" style="font-size:12px;">Demo: Founder →</button>
           <button class="btn btn-dark" onclick="loggedInAs='investor';go('investor-dealflow')" style="font-size:12px;">Demo: Investor →</button>
           <button class="btn btn-dark" onclick="reviewerDemo()" style="font-size:12px;">Demo: Reviewer →</button>
+          <button class="btn btn-dark" onclick="adminDemoSignIn()" style="font-size:12px;">Demo: Admin →</button>
         </div>
         <button class="btn btn-outline btn-full" onclick="go('reviewer-login')" style="font-size:12px;">Reviewer sign-in (real TiE Charter Member) →</button>
       </div>
@@ -1057,7 +1058,51 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
       <div class="form-group">
         <label>Target raise amount</label>
-        <input type="text" placeholder="e.g. ₹3 Cr" />
+        <div style="display:flex;gap:8px;">
+          <select id="raise-currency" style="flex:0 0 auto;max-width:48%;padding:11px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dark);background:#fff;">
+            <option value="INR" selected>Indian Rupee — INR (₹)</option>
+            <option value="USD">US Dollar — USD ($)</option>
+            <option value="EUR">Euro — EUR (€)</option>
+            <option value="GBP">British Pound — GBP (£)</option>
+            <option value="AED">UAE Dirham — AED (د.إ)</option>
+            <option value="AUD">Australian Dollar — AUD (A$)</option>
+            <option value="BDT">Bangladeshi Taka — BDT (৳)</option>
+            <option value="BRL">Brazilian Real — BRL (R$)</option>
+            <option value="CAD">Canadian Dollar — CAD (C$)</option>
+            <option value="CHF">Swiss Franc — CHF (Fr)</option>
+            <option value="CNY">Chinese Yuan — CNY (¥)</option>
+            <option value="DKK">Danish Krone — DKK (kr)</option>
+            <option value="EGP">Egyptian Pound — EGP (E£)</option>
+            <option value="HKD">Hong Kong Dollar — HKD (HK$)</option>
+            <option value="IDR">Indonesian Rupiah — IDR (Rp)</option>
+            <option value="ILS">Israeli New Shekel — ILS (₪)</option>
+            <option value="JPY">Japanese Yen — JPY (¥)</option>
+            <option value="KES">Kenyan Shilling — KES (KSh)</option>
+            <option value="KRW">South Korean Won — KRW (₩)</option>
+            <option value="LKR">Sri Lankan Rupee — LKR (Rs)</option>
+            <option value="MXN">Mexican Peso — MXN (Mex$)</option>
+            <option value="MYR">Malaysian Ringgit — MYR (RM)</option>
+            <option value="NGN">Nigerian Naira — NGN (₦)</option>
+            <option value="NOK">Norwegian Krone — NOK (kr)</option>
+            <option value="NPR">Nepalese Rupee — NPR (रू)</option>
+            <option value="NZD">New Zealand Dollar — NZD (NZ$)</option>
+            <option value="PHP">Philippine Peso — PHP (₱)</option>
+            <option value="PKR">Pakistani Rupee — PKR (₨)</option>
+            <option value="PLN">Polish Zloty — PLN (zł)</option>
+            <option value="QAR">Qatari Riyal — QAR (﷼)</option>
+            <option value="RUB">Russian Ruble — RUB (₽)</option>
+            <option value="SAR">Saudi Riyal — SAR (﷼)</option>
+            <option value="SEK">Swedish Krona — SEK (kr)</option>
+            <option value="SGD">Singapore Dollar — SGD (S$)</option>
+            <option value="THB">Thai Baht — THB (฿)</option>
+            <option value="TRY">Turkish Lira — TRY (₺)</option>
+            <option value="TWD">Taiwan Dollar — TWD (NT$)</option>
+            <option value="VND">Vietnamese Dong — VND (₫)</option>
+            <option value="ZAR">South African Rand — ZAR (R)</option>
+            <option value="OTHER">Other currency</option>
+          </select>
+          <input id="raise-amount" type="text" placeholder="e.g. 3 Cr · 2M · 500k" style="flex:1;" />
+        </div>
       </div>
     </div>
 
