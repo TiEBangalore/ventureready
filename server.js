@@ -689,6 +689,20 @@ function diagnostic_run_count(founder_id, days) {
   return row ? row.n : 0;
 }
 
+// Demo founder accounts whose AI-read cap can be reset from the UI. Real founders
+// can NOT reset their own cap — the reset endpoint refuses any other email.
+const DEMO_FOUNDER_EMAILS = new Set(["rohan@stackr.io", "demo.founder@tiebangalore.org"]);
+function diagnostic_reset_demo(founder_id, email) {
+  let row = null;
+  if (founder_id) row = db.prepare("SELECT id, email FROM founder WHERE id=?").get(founder_id);
+  if (!row && email) row = db.prepare("SELECT id, email FROM founder WHERE email=?").get(email);
+  if (!row || !DEMO_FOUNDER_EMAILS.has(String(row.email || "").trim().toLowerCase())) {
+    return { error: "Reset is only available on the demo founder account.", status: 403 };
+  }
+  db.prepare("DELETE FROM diagnostic WHERE founder_id=?").run(row.id);
+  return { ok: true, runs_remaining: FOUNDER_DIAGNOSTIC_CAP, runs_cap: FOUNDER_DIAGNOSTIC_CAP };
+}
+
 // ---- load .env (private config: Zoho keys + optional Anthropic key) ----
 const ENV = {};
 try {
@@ -2261,6 +2275,9 @@ async function handlePost(req, res, urlObj, data) {
       result.runs_window_days = FOUNDER_DIAGNOSTIC_WINDOW_DAYS;
     }
     return sendJson(res, 200, result);
+  } else if (p === "/api/diagnostic/reset") {
+    const out = diagnostic_reset_demo(data.founder_id, data.email || "");
+    return sendJson(res, out.error ? (out.status || 400) : 200, out);
   } else if (p === "/api/reviewer/signup") {
     const out = reviewer_signup(data);
     return sendJson(res, out.error ? 400 : 200, out);

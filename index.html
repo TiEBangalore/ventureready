@@ -1081,7 +1081,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <div style="display:flex;align-items:flex-start;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:16px;font-size:12px;color:var(--grey);line-height:1.6;">
       <span style="color:var(--red);font-weight:800;flex-shrink:0;">i</span>
-      <div>You get <strong style="color:var(--dark);">2 free AI reads every 30 days</strong>. Re-running the <em>same</em> deck is always free — the limit only applies to brand-new reads. Deeper, human scoring across all six investor-readiness dimensions comes with the paid expert review.</div>
+      <div>You get <strong style="color:var(--dark);">2 free AI reads every 30 days</strong>. Re-running the <em>same</em> deck is always free — the limit only applies to brand-new reads. Deeper, human scoring across all six investor-readiness dimensions comes with the paid expert review.<a id="demo-reset-link" onclick="resetDemoReads()" style="display:none;color:var(--red);font-weight:700;cursor:pointer;margin-left:8px;">Reset free reads (demo) →</a></div>
     </div>
     <div class="upload-actions">
       <button class="btn btn-outline" onclick="go('login')">← Back</button>
@@ -5221,8 +5221,30 @@ async function demoFounder(){
       body:JSON.stringify({name:'Rohan Verma',email:'rohan@stackr.io',company:'Stackr',role:'Founder & CEO',city:'Bengaluru',stage:'Seed',sector:'B2B SaaS'})});
     _applyFounder(await r.json());
   }catch(e){}
-  loggedInAs='founder'; go('upload');
+  loggedInAs='founder'; _syncDemoUI(); go('upload');
 }
+
+// Demo-only convenience: the founder demo account can reset its free-read cap so
+// the diagnostic can be shown repeatedly. Guarded server-side — real founders
+// can't reset. Emails must match DEMO_FOUNDER_EMAILS on the server.
+function _isDemoFounder(){
+  var e=(window._founderEmail||'').trim().toLowerCase();
+  return e==='rohan@stackr.io' || e==='demo.founder@tiebangalore.org';
+}
+function _syncDemoUI(){
+  var l=document.getElementById('demo-reset-link');
+  if(l) l.style.display = _isDemoFounder() ? 'inline' : 'none';
+}
+async function resetDemoReads(){
+  try{
+    var r=await fetch('/api/diagnostic/reset',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_id:window._founderId||null, email:window._founderEmail||''})});
+    var d=await r.json();
+    if(d && d.ok){ alert('Demo reads reset — you can run the diagnostic again.'); go('upload'); }
+    else { alert((d && d.error) ? d.error : 'Could not reset.'); }
+  }catch(e){ alert('Could not reset.'); }
+}
+window.addEventListener('load', _syncDemoUI);
 
 // On page load, if we remember a founder, reload their real profile + last read from the DB.
 async function _restoreFounder(){
@@ -6576,7 +6598,9 @@ function renderDiagnostic(d){
     modeEl.style.background = '#fef3c7'; modeEl.style.color = '#92400e';
     sumEl.innerHTML =
       '<div style="font-size:14.5px;line-height:1.6;">' + _esc((d && d.summary) ? d.summary : '') + '</div>'
-      + '<div style="margin-top:14px;"><button class="btn btn-red" onclick="go(\'artifacts\')">Submit for expert review →</button></div>';
+      + '<div style="margin-top:14px;"><button class="btn btn-red" onclick="go(\'artifacts\')">Submit for expert review →</button>'
+      + (_isDemoFounder() ? ' <button class="btn btn-outline" onclick="resetDemoReads()" style="margin-left:8px;">Reset free reads (demo) →</button>' : '')
+      + '</div>';
     findEl.innerHTML = '';
     return;
   }

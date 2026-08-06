@@ -720,6 +720,27 @@ def diagnostic_run_count(founder_id, days):
     conn.close()
     return row["n"] if row else 0
 
+# Demo founder accounts whose AI-read cap can be reset from the UI. Real founders
+# can NOT reset their own cap — the reset endpoint refuses any other email.
+DEMO_FOUNDER_EMAILS = {"rohan@stackr.io", "demo.founder@tiebangalore.org"}
+
+def diagnostic_reset_demo(founder_id, email):
+    """Clear a DEMO founder's AI-read history so the run-cap resets to full.
+    Guarded: only works for a recognised demo account."""
+    conn = _db()
+    row = None
+    if founder_id:
+        row = conn.execute("SELECT id, email FROM founder WHERE id=?", (founder_id,)).fetchone()
+    if not row and email:
+        row = conn.execute("SELECT id, email FROM founder WHERE email=?", (email,)).fetchone()
+    if not row or (row["email"] or "").strip().lower() not in DEMO_FOUNDER_EMAILS:
+        conn.close()
+        return {"error": "Reset is only available on the demo founder account.", "status": 403}
+    conn.execute("DELETE FROM diagnostic WHERE founder_id=?", (row["id"],))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "runs_remaining": FOUNDER_DIAGNOSTIC_CAP, "runs_cap": FOUNDER_DIAGNOSTIC_CAP}
+
 # ---- load .env (private config: Zoho keys + optional Anthropic key) ----
 ENV = {}
 try:
@@ -2372,6 +2393,9 @@ class Handler(BaseHTTPRequestHandler):
                         result["runs_cap"] = FOUNDER_DIAGNOSTIC_CAP
                         result["runs_window_days"] = FOUNDER_DIAGNOSTIC_WINDOW_DAYS
                     self._send(200, result)
+            elif self.path == "/api/diagnostic/reset":
+                out = diagnostic_reset_demo(data.get("founder_id"), data.get("email", ""))
+                self._send(out.get("status", 400) if out.get("error") else 200, out)
             elif self.path == "/api/reviewer/signup":
                 out = reviewer_signup(data)
                 self._send(400 if out.get("error") else 200, out)
