@@ -130,10 +130,11 @@ footer.site-footer{border-top:1px solid var(--border);margin-top:60px;padding:24
 .expert-quote{font-size:13px;color:rgba(255,255,255,.7);line-height:1.6;font-style:italic;}
 
 /* CTA block */
-.cta-block{border:1.5px solid var(--red);border-radius:8px;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;}
+.cta-block{border:1.5px solid var(--red);border-radius:8px;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;}
 .cta-block h3{font-size:18px;font-weight:700;margin-bottom:6px;}
 .cta-block p{font-size:13px;color:var(--grey);line-height:1.55;max-width:440px;}
-.cta-right{text-align:right;flex-shrink:0;}
+.cta-block>div:first-child{flex:1 1 240px;min-width:220px;}
+.cta-right{text-align:right;flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;}
 .cta-price{font-size:20px;font-weight:800;color:var(--dark);margin-bottom:12px;}
 .cta-price span{font-size:13px;font-weight:400;color:var(--grey);}
 
@@ -1412,7 +1413,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           </div>
           <div class="upload-grid">
             <div class="form-group">
-              <label>Current debt liability</label>
+              <label>Current debt liability <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(optional — more relevant at later stages)</span></label>
               <div style="display:flex;gap:8px;"><select class="cur-select" id="q-debt-cur" style="flex:0 0 auto;max-width:42%;padding:11px 8px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:#fff;"></select><input id="q-debt" type="text" placeholder="e.g. 0 — or 2 Cr" style="flex:1;" /></div>
             </div>
             <div class="form-group">
@@ -1422,7 +1423,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           </div>
           <div class="upload-grid">
             <div class="form-group">
-              <label>Expected investor return</label>
+              <label>Expected investor return <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(optional — more relevant at later stages)</span></label>
               <input id="q-return" type="text" placeholder="e.g. 3.9x MOIC / 40% IRR over 5 yrs" />
             </div>
             <div class="form-group">
@@ -1434,12 +1435,29 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <label>Team track record — prior growth journeys</label>
             <input id="q-track" type="text" placeholder="e.g. Co-founder scaled a prior startup from ₹8 Cr to ₹100 Cr." />
           </div>
+          <div class="form-group">
+            <label>Co-founder LinkedIn profiles <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(optional — you can share these instead of writing the track record above)</span></label>
+            <input id="q-linkedin" type="text" placeholder="e.g. linkedin.com/in/… , linkedin.com/in/…" />
+          </div>
           <div style="margin-top:4px;font-size:11.5px;color:var(--grey);line-height:1.6;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px;">These details aren't scored here. They're shared with your expert reviewer and, once you earn the mark, with investors — so they can weigh your plan in context.</div>
+        </div>
+
+        <!-- Section 8: the founder's own questions for the expert (Arise: capture targeted asks upfront) -->
+        <div style="margin-bottom:32px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
+            <div style="width:26px;height:26px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">8</div>
+            <div style="font-size:14px;font-weight:800;">What should your reviewer focus on? <span style="font-weight:600;color:var(--grey);font-size:12px;">— optional, but recommended</span></div>
+          </div>
+          <div class="form-group">
+            <label>Anything specific you want the expert's help on?</label>
+            <textarea id="q-focus" rows="3" placeholder="e.g. Is our GTM realistic for a 3-person team? Is the ₹200 Cr target credible given our traction? Which weakness should we fix before raising?"></textarea>
+            <div style="font-size:11px;color:var(--grey);margin-top:6px;line-height:1.5;">Your reviewer sees this first, so they can spend your review answering what actually matters to you.</div>
+          </div>
         </div>
 
         <div style="display:flex;justify-content:flex-end;gap:12px;">
           <button class="btn btn-outline" onclick="go('diagnostic')">← Back</button>
-          <button class="btn btn-red btn-lg" onclick="go('artifacts')">Submit for Expert Review →</button>
+          <button class="btn btn-red btn-lg" onclick="window._founderFocus=(document.getElementById('q-focus')||{}).value||''; go('artifacts')">Submit for Expert Review →</button>
         </div>
       </div>
 
@@ -2331,13 +2349,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div class="cta-block">
       <div>
         <h3 id="prof-cta-h">Interested in Stackr?</h3>
-        <p>Meeting requests are routed through the TiE Bangalore team, who facilitate the introduction. You won't be contacting the founder directly.</p>
+        <p>Book directly on the founder's calendar. Every booking request is logged so TiE can track the meetings the platform generates.</p>
       </div>
       <div class="cta-right" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
         <button class="btn btn-outline btn-lg" onclick="openDeck('investor-profile','NDA-signed investor')">View pitch deck</button>
         <button class="btn btn-outline btn-lg" onclick="go('investor-dataroom')">Open data room</button>
         <button class="btn btn-outline btn-lg" onclick="downloadFeedbackPDF('investor')">Download feedback (PDF)</button>
-        <button class="btn btn-red btn-lg" onclick="requestMeeting(this)">Request Meeting via TiE →</button>
+        <button class="btn btn-red btn-lg" onclick="bookMeeting(this)">Book a meeting →</button>
       </div>
     </div>
   </div>
@@ -2350,8 +2368,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
   <div class="login-bg">
     <div class="login-card center-card" style="text-align:center;">
       <div class="icon-circle approved">✓</div>
-      <h1>Request sent to TiE</h1>
-      <p class="sub" style="margin-bottom:22px;">Your meeting request for <strong id="ms-co">Stackr</strong> has been sent to the TiE Bangalore team. They'll coordinate directly with you and the founder to schedule — you won't need to message the founder yourself.</p>
+      <h1>Booking request logged</h1>
+      <p class="sub" style="margin-bottom:22px;">Your interest in meeting <strong id="ms-co">Stackr</strong> has been recorded. This founder hasn't added a scheduling link yet — they'll be nudged to share one, and you'll be able to book directly on their calendar.</p>
       <button class="btn btn-red btn-full btn-lg" onclick="go('investor-dealflow')">Back to Deal Flow</button>
     </div>
   </div>
@@ -2537,6 +2555,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
       <!-- LEFT COLUMN -->
       <div>
+
+        <!-- What the founder asked you to focus on — shown first (Arise feedback) -->
+        <div id="rev-focus-wrap" style="border:1.5px solid #FDE68A;background:#FFFBEB;border-radius:12px;padding:16px 18px;margin-bottom:24px;">
+          <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#92400E;margin-bottom:7px;">What the founder wants your help on</div>
+          <div id="rev-focus-text" style="font-size:13px;color:var(--dark);line-height:1.6;white-space:pre-wrap;">—</div>
+        </div>
 
         <!-- Step 1 -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
@@ -2878,6 +2902,33 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div id="investor-deals"></div>
     </div>
 
+    <!-- Investor's own free scheduling link -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Your meeting scheduling link</div>
+      <div style="font-size:12px;color:var(--grey);line-height:1.55;margin-bottom:12px;">Pick a <strong>free</strong> tool and paste your own link so founders can book time with you directly. <strong>TiE doesn't host or pay for scheduling</strong> — you use your own free account.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <select id="iv-scheduler-platform" class="scheduler-platform" style="flex:0 0 auto;padding:10px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
+          <option value="Calendly">Calendly (free plan)</option>
+          <option value="Google Calendar">Google Calendar / Meet (free)</option>
+          <option value="Cal.com">Cal.com (free / open-source)</option>
+          <option value="Zoho Bookings">Zoho Bookings (free plan)</option>
+          <option value="TidyCal">TidyCal (free plan)</option>
+          <option value="Microsoft Teams">Microsoft Teams (free)</option>
+          <option value="Other">Other free tool</option>
+        </select>
+        <input type="text" id="iv-scheduler" placeholder="e.g. https://calendly.com/yourfund/intro" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+        <button class="btn btn-red" style="font-size:12px;padding:9px 16px;flex-shrink:0;" onclick="saveInvestorScheduler(this)">Save link</button>
+      </div>
+      <div id="iv-scheduler-msg" style="font-size:11.5px;margin-top:8px;display:none;"></div>
+    </div>
+
+    <!-- Your meetings: two-sided "we met" confirmation -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Your founder meetings</div>
+      <div style="font-size:12px;color:var(--grey);line-height:1.55;margin-bottom:6px;">After you book and meet a founder, confirm it here. A meeting counts as <strong>held</strong> only once both sides confirm.</div>
+      <div id="investor-meetings"></div>
+    </div>
+
     <!-- Tier progress -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -3121,6 +3172,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <div id="founder-deals"></div>
     </div>
 
+    <!-- Your meetings: two-sided "we met" confirmation -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Your investor meetings</div>
+      <div style="font-size:12px;color:var(--grey);line-height:1.55;margin-bottom:6px;">When an investor books you, confirm once you've met. A meeting counts as <strong>held</strong> only when both of you confirm — that's how TiE measures real meetings, not just requests.</div>
+      <div id="founder-meetings"></div>
+    </div>
+
     <!-- Data room: the next thing an investor asks for -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
       <div style="font-size:26px;flex-shrink:0;"></div>
@@ -3129,6 +3187,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="font-size:12px;color:var(--grey);line-height:1.55;">Now that you're VentureReady, you can open a secure data room for the documents an investor asks for after a good meeting — cap table, agreements, SAFE notes. Set it up when you're ready; nothing to upload before then.</div>
       </div>
       <button class="btn btn-outline" style="font-size:12px;padding:8px 16px;flex-shrink:0;" onclick="go('dataroom')">Explore data room →</button>
+    </div>
+
+    <!-- Meeting scheduling link: investors book directly on the founder's calendar -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Your meeting scheduling link</div>
+      <div style="font-size:12px;color:var(--grey);line-height:1.55;margin-bottom:12px;">Pick a <strong>free</strong> scheduling tool, sign up with your own account, and paste your link. Investors book directly on your calendar — no back-and-forth. <strong>TiE doesn't host or pay for scheduling</strong> — you use your own free account.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <select id="fp-scheduler-platform" class="scheduler-platform" style="flex:0 0 auto;padding:10px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
+          <option value="Calendly">Calendly (free plan)</option>
+          <option value="Google Calendar">Google Calendar / Meet (free)</option>
+          <option value="Cal.com">Cal.com (free / open-source)</option>
+          <option value="Zoho Bookings">Zoho Bookings (free plan)</option>
+          <option value="TidyCal">TidyCal (free plan)</option>
+          <option value="Microsoft Teams">Microsoft Teams (free)</option>
+          <option value="Other">Other free tool</option>
+        </select>
+        <input type="text" id="fp-scheduler" placeholder="e.g. https://calendly.com/yourname/intro" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+        <button class="btn btn-red" style="font-size:12px;padding:9px 16px;flex-shrink:0;" onclick="saveScheduler(this)">Save link</button>
+      </div>
+      <div id="fp-scheduler-msg" style="font-size:11.5px;margin-top:8px;display:none;"></div>
     </div>
 
     <!-- How you earned the mark: the re-review loop made visible -->
@@ -5084,6 +5162,7 @@ async function renderDataRoom(){
 
   var data = await _drFetch();
   var byKey = {}; (data.docs||[]).forEach(function(d){ byKey[d.item_key]=d; });
+  var reqByKey = {}; (data.requests||[]).forEach(function(r){ (reqByKey[r.item_key]=reqByKey[r.item_key]||[]).push(r); });
   var deckName = _drDeckFromDiagnostic();
   if(deckName && !byKey['pitch_deck']) byKey['pitch_deck'] = {filename:deckName, fromDiagnostic:true};
 
@@ -5112,8 +5191,10 @@ async function renderDataRoom(){
       : 'Not provided yet';
     html += '<div class="dr-row'+(d?' done':'')+'">'
       + '<div class="dr-ic">'+(d?'✓':'○')+'</div>'
-      + '<div><div class="dr-name">'+it.label+(it.req?'<span class="dr-req">Required</span>':'')+'</div>'
-      + '<div class="dr-sub">'+sub+'</div></div>'
+      + '<div style="flex:1;min-width:0;"><div class="dr-name">'+it.label+(it.req?'<span class="dr-req">Required</span>':'')+'</div>'
+      + '<div class="dr-sub">'+sub+'</div>'
+      + _drAccessControl(it.key, d, reqByKey[it.key]||[])
+      + '</div>'
       + '<div class="dr-act"><button class="btn '+(d?'btn-outline':'btn-red')+'" style="font-size:11px;padding:6px 12px;" '
       + 'onclick="drUpload(\''+it.key+'\')">'+(d?'Replace':'Upload')+'</button></div></div>';
   });
@@ -5128,6 +5209,45 @@ async function renderDataRoom(){
         +(it?it.label:v.item_key)+'</div><div style="color:var(--grey);">'+(v.viewed_at||'')+'</div></div>';
     }).join('') : '<div class="dr-view-row" style="color:var(--grey);">No one has opened your data room yet. Views appear here once an investor with a signed NDA opens a document.</div>';
   }
+}
+
+// Founder's per-document access control: shared / request-only / private, plus
+// approve/decline for each investor who asks for a request-only document.
+function _drAccessControl(itemKey, d, reqs){
+  if(!d || d.fromDiagnostic) return '';
+  var acc = d.access || 'shared';
+  var opts=[['shared','Shared with NDA investors'],['request','Request-only — you approve each'],['private','Private — only you']];
+  var sel='<select onchange="drSetAccess(\''+itemKey+'\',this.value)" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--dark);">'
+    + opts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===acc?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>';
+  var extra='';
+  if(acc==='request'){
+    var pending=(reqs||[]).filter(function(r){return r.status==='pending';});
+    var approved=(reqs||[]).filter(function(r){return r.status==='approved';});
+    if(pending.length){
+      extra+='<div style="margin-top:7px;">'+pending.map(function(r){
+        return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-top:4px;flex-wrap:wrap;">'
+          +'<span style="flex:1;min-width:120px;color:var(--dark);"><strong>'+_esc(r.investor)+'</strong> requested access</span>'
+          +'<button class="btn btn-red" style="font-size:10.5px;padding:3px 10px;" data-inv="'+_esc(r.investor)+'" onclick="drDecide(\''+itemKey+'\',this.getAttribute(\'data-inv\'),\'approve\')">Approve</button>'
+          +'<button class="btn btn-outline" style="font-size:10.5px;padding:3px 10px;" data-inv="'+_esc(r.investor)+'" onclick="drDecide(\''+itemKey+'\',this.getAttribute(\'data-inv\'),\'decline\')">Decline</button>'
+          +'</div>';
+      }).join('')+'</div>';
+    }
+    if(approved.length){
+      extra+='<div style="margin-top:6px;font-size:11px;color:var(--green);">Has access: '+approved.map(function(r){return _esc(r.investor);}).join(', ')+'</div>';
+    }
+  }
+  return '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    +'<span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--grey);">Who can access</span>'+sel+'</div>'+extra;
+}
+function drSetAccess(itemKey, access){
+  if(!window._founderId) return;
+  fetch('/api/dataroom/access',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({founder_id:window._founderId,item_key:itemKey,access:access})}).then(function(){ renderDataRoom(); });
+}
+function drDecide(itemKey, investor, decision){
+  if(!window._founderId) return;
+  fetch('/api/dataroom/decide',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({founder_id:window._founderId,item_key:itemKey,investor:investor,decision:decision})}).then(function(){ renderDataRoom(); });
 }
 
 function drUpload(itemKey){
@@ -5149,34 +5269,48 @@ function drUpload(itemKey){
   inp.click();
 }
 
-// ── Investor side: NDA-gated index of what the founder has provided ──
+// ── Investor side: only what the founder has shared with THIS investor ──
+function _investorKey(){ return window._investorName || (typeof PROFILES!=='undefined' && PROFILES.investor && PROFILES.investor.name) || window._investorEmail || 'Investor'; }
+async function _drInvestorFetch(){
+  if(!window._founderId) return {docs:[]};
+  try{ var r=await fetch('/api/dataroom?founder_id='+encodeURIComponent(window._founderId)+'&investor='+encodeURIComponent(_investorKey())); return await r.json(); }catch(e){ return {docs:[]}; }
+}
 async function renderInvestorDataRoom(){
   var co = window._drCompany || 'This founder';
   var t=document.getElementById('idr-title'); if(t) t.textContent = co + ' — data room';
   var o=document.getElementById('idr-overline'); if(o) o.textContent = 'Data Room · NDA-gated';
 
-  var data = await _drFetch();
+  var data = await _drInvestorFetch();
   var byKey={}; (data.docs||[]).forEach(function(d){ byKey[d.item_key]=d; });
   var deckName=_drDeckFromDiagnostic();
-  if(deckName && !byKey['pitch_deck']) byKey['pitch_deck']={filename:deckName, fromDiagnostic:true};
+  if(deckName && !byKey['pitch_deck']) byKey['pitch_deck']={filename:deckName, state:'open'};
 
-  var provided=DATAROOM_ITEMS.filter(function(i){return byKey[i.key];}).length;
-  var html='<p style="font-size:12.5px;color:var(--grey);margin-bottom:14px;"><strong>'+provided+' of '+DATAROOM_ITEMS.length
-    +'</strong> items provided. Gaps are shown too — what a founder has <em>not</em> supplied is itself information.</p>';
+  var html='<p style="font-size:12.5px;color:var(--grey);margin-bottom:14px;">You see the documents this founder has shared with you. Some are <strong>request-only</strong> — ask, and the founder approves access per person. Documents the founder has kept private are not shown.</p>';
   var lastCat='';
   DATAROOM_ITEMS.forEach(function(it){
     if(it.cat!==lastCat){ html+='<div class="dr-cat">'+it.cat+'</div>'; lastCat=it.cat; }
     var d=byKey[it.key];
-    html += '<div class="dr-row'+(d?' done':'')+'">'
-      + '<div class="dr-ic">'+(d?'✓':'○')+'</div>'
-      + '<div><div class="dr-name">'+it.label+(it.req?'<span class="dr-req">Required</span>':'')+'</div>'
-      + '<div class="dr-sub" id="idr-sub-'+it.key+'">'+(d?(d.filename+(d.size?' · '+_drFmtSize(d.size):'')):'Not yet provided by the founder')+'</div></div>'
-      + '<div class="dr-act">'+(d
-          ? '<button class="btn btn-outline" style="font-size:11px;padding:6px 12px;" onclick="idrOpen(\''+it.key+'\','+(d.id||0)+')">Open</button>'
-          : '<span style="font-size:11px;color:var(--mid);">—</span>')
-      + '</div></div>';
+    var state = d ? (d.state||'open') : 'none';
+    var icon = (state==='open') ? '✓' : '○';
+    var sub, act;
+    if(state==='open'){ sub=(d.filename||'Provided')+(d.size?' · '+_drFmtSize(d.size):''); act='<button class="btn btn-outline" style="font-size:11px;padding:6px 12px;" onclick="idrOpen(\''+it.key+'\','+(d.id||0)+')">Open</button>'; }
+    else if(state==='locked'){ sub='Request-only — ask the founder for access'; act='<button class="btn btn-red" style="font-size:11px;padding:6px 12px;" onclick="drRequestAccess(\''+it.key+'\')">Request access</button>'; }
+    else if(state==='pending'){ sub='Your request is awaiting the founder'; act='<span style="font-size:11px;color:#B45309;font-weight:700;">Requested</span>'; }
+    else if(state==='declined'){ sub='The founder declined this request'; act='<span style="font-size:11px;color:var(--grey);">Declined</span>'; }
+    else { sub='Not yet provided by the founder'; act='<span style="font-size:11px;color:var(--mid);">—</span>'; }
+    html += '<div class="dr-row'+(state==='open'?' done':'')+'">'
+      + '<div class="dr-ic">'+icon+'</div>'
+      + '<div style="flex:1;min-width:0;"><div class="dr-name">'+it.label+(it.req?'<span class="dr-req">Required</span>':'')+'</div>'
+      + '<div class="dr-sub" id="idr-sub-'+it.key+'">'+sub+'</div></div>'
+      + '<div class="dr-act">'+act+'</div></div>';
   });
   var l=document.getElementById('idr-list'); if(l) l.innerHTML=html;
+}
+async function drRequestAccess(itemKey){
+  if(!window._founderId) return;
+  try{ await fetch('/api/dataroom/request',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({founder_id:window._founderId,item_key:itemKey,investor:_investorKey()})}); }catch(e){}
+  renderInvestorDataRoom();
 }
 
 async function idrOpen(itemKey, docId){
@@ -5200,8 +5334,11 @@ function go(name){
   if(name==='investor-dataroom' && typeof renderInvestorDataRoom==='function') renderInvestorDataRoom();
   if(name==='verdict-notyet' && typeof populateNotYet==='function') populateNotYet();
   if((name==='profile'||name==='verdict') && typeof renderFounderProfile==='function') renderFounderProfile();
+  if((name==='profile'||name==='verdict') && typeof renderFounderMeetings==='function') renderFounderMeetings();
   if(name==='profile' && typeof loadFounderDeals==='function') loadFounderDeals();
   if(name==='investor-account' && typeof loadInvestorDeals==='function') loadInvestorDeals();
+  if(name==='investor-account' && typeof loadInvestorScheduler==='function') loadInvestorScheduler();
+  if(name==='investor-account' && typeof renderInvestorMeetings==='function') renderInvestorMeetings();
   if(name==='investor-dealflow' && typeof loadDealflow==='function') loadDealflow();
   if(name==='impact' && typeof loadImpact==='function') loadImpact();
   if(name==='reviewer-dashboard' && typeof loadReviewerQueue==='function') loadReviewerQueue();
@@ -5272,6 +5409,40 @@ function renderFounderProfile(){
   set('fp-score-hist', 'Score history — '+company);
   set('fp-activity-hd', 'Recent activity — '+company);
   set('fp-verdict-h1', p.name+" — you're VentureReady.");
+  // Load the saved scheduling link into the field.
+  var sf=document.getElementById('fp-scheduler'), spf=document.getElementById('fp-scheduler-platform');
+  if(sf && window._founderId){
+    fetch('/api/founder?id='+encodeURIComponent(window._founderId)).then(function(r){return r.json();})
+      .then(function(fd){ if(fd){ if(typeof fd.scheduler_url==='string') sf.value=fd.scheduler_url; if(spf && fd.scheduler_platform) spf.value=fd.scheduler_platform; } }).catch(function(){});
+  }
+}
+async function saveScheduler(btn){
+  var sf=document.getElementById('fp-scheduler'), spf=document.getElementById('fp-scheduler-platform'), msg=document.getElementById('fp-scheduler-msg');
+  if(!window._founderId){ if(msg){msg.style.display='';msg.style.color='var(--red)';msg.textContent='Sign in as a founder first.';} return; }
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    await fetch('/api/founder/scheduler',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_id:window._founderId, scheduler_url:(sf?sf.value:''), scheduler_platform:(spf?spf.value:'')})});
+    if(msg){ msg.style.display=''; msg.style.color='var(--green)'; msg.textContent='Saved — investors can now book directly on your '+((spf&&spf.value)||'calendar')+'.'; }
+  }catch(e){ if(msg){ msg.style.display=''; msg.style.color='var(--red)'; msg.textContent='Could not save — is the server running?'; } }
+  if(btn){ btn.disabled=false; btn.textContent='Save link'; }
+}
+function loadInvestorScheduler(){
+  var sf=document.getElementById('iv-scheduler'), spf=document.getElementById('iv-scheduler-platform');
+  if(!sf || !window._investorId) return;
+  fetch('/api/investor/scheduler?investor_id='+encodeURIComponent(window._investorId)).then(function(r){return r.json();})
+    .then(function(d){ if(d){ if(typeof d.scheduler_url==='string') sf.value=d.scheduler_url; if(spf && d.scheduler_platform) spf.value=d.scheduler_platform; } }).catch(function(){});
+}
+async function saveInvestorScheduler(btn){
+  var sf=document.getElementById('iv-scheduler'), spf=document.getElementById('iv-scheduler-platform'), msg=document.getElementById('iv-scheduler-msg');
+  if(!window._investorId){ if(msg){msg.style.display='';msg.style.color='var(--red)';msg.textContent='Sign in as an investor first.';} return; }
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    await fetch('/api/investor/scheduler',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({investor_id:window._investorId, scheduler_url:(sf?sf.value:''), scheduler_platform:(spf?spf.value:'')})});
+    if(msg){ msg.style.display=''; msg.style.color='var(--green)'; msg.textContent='Saved — founders can now book time with you on your '+((spf&&spf.value)||'calendar')+'.'; }
+  }catch(e){ if(msg){ msg.style.display=''; msg.style.color='var(--red)'; msg.textContent='Could not save — is the server running?'; } }
+  if(btn){ btn.disabled=false; btn.textContent='Save link'; }
 }
 function toggleProfileMenu(e){ if(e){e.stopPropagation();} var m=document.getElementById('np-menu'); if(m) m.style.display = (m.style.display==='block')?'none':'block'; }
 function closeProfileMenu(){ var m=document.getElementById('np-menu'); if(m) m.style.display='none'; }
@@ -5985,22 +6156,62 @@ async function submitInvestorInvites(btn){
 }
 
 // ---- Meeting requests (TiE facilitates every introduction) ----------------
-async function requestMeeting(btn){
+// Every booking click is LOGGED — that's how TiE tracks the meetings the platform
+// generates. If the founder shared a scheduling link, it opens too; if not, the
+// request is still recorded and the founder is nudged to share a time.
+async function bookMeeting(btn){
   function T(id){ var el=document.getElementById(id); return el?el.textContent.trim():''; }
   var startup=T('prof-co');
-  var founderLine=T('prof-founder');
-  var founderName=founderLine.split('·')[0].trim();
   if(btn){ btn.disabled=true; btn.textContent='Requesting…'; }
+  var link='';
   try{
-    var r=await fetch('/api/meeting/request',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({founder_name:founderName, startup:startup,
+    if(window._founderId){ var fr=await fetch('/api/founder?id='+encodeURIComponent(window._founderId)); var fd=await fr.json(); link=(fd&&fd.scheduler_url)||''; }
+  }catch(e){}
+  // Always record the request first — this is the tracked meeting event for TiE.
+  try{
+    await fetch('/api/meeting/request',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({founder_id:window._founderId, startup:startup, via:'scheduler',
         investor_email:window._investorEmail||'', investor_name:window._investorName||''})});
-    var out=await r.json();
-    if(btn){ btn.disabled=false; btn.textContent='Request Meeting via TiE →'; }
-    if(out.error){ alert(out.error); return; }
-    go('investor-meeting-sent');
-  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Request Meeting via TiE →'; }
-    alert('Could not reach the server. Please try again.'); }
+  }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='Book a meeting →'; }
+  if(link){ window.open(link, '_blank', 'noopener'); }
+  else { go('investor-meeting-sent'); }   // no link yet — confirmation; founder gets nudged
+}
+
+// ---- Two-sided "we met" confirmation (founder + investor) -----------------
+function _mtgRow(m, party){
+  var who = party==='founder' ? (m.investor_name||m.investor_email||'An investor') : (m.startup||m.founder_name||'A founder');
+  var mine = party==='founder' ? m.founder_confirmed : m.investor_confirmed;
+  var held = m.status==='held';
+  var status;
+  if(held) status='<span style="color:var(--green);font-weight:700;">Met — confirmed by both</span>';
+  else if(mine) status='<span style="color:#B45309;">You confirmed — awaiting the other side</span>';
+  else status='<span style="color:var(--grey);">Booking requested'+(m.requested_at?(' · '+String(m.requested_at).split(' ')[0]):'')+'</span>';
+  var act = (held||mine) ? '' : '<button class="btn btn-outline" style="font-size:11px;padding:5px 11px;" onclick="confirmMeetingHeld('+m.id+',\''+party+'\')">We met →</button>';
+  return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border);">'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--dark);">'+_esc(who)+'</div>'
+    +'<div style="font-size:11.5px;margin-top:2px;">'+status+'</div></div>'
+    +'<div style="flex-shrink:0;">'+act+'</div></div>';
+}
+async function renderFounderMeetings(){
+  var el=document.getElementById('founder-meetings'); if(!el||!window._founderId) return;
+  var d; try{ d=await (await fetch('/api/meetings?founder_id='+encodeURIComponent(window._founderId))).json(); }catch(e){ return; }
+  var ms=(d&&d.meetings)||[];
+  el.innerHTML = ms.length ? ms.map(function(m){return _mtgRow(m,'founder');}).join('')
+    : '<div style="font-size:12px;color:var(--grey);padding:8px 0;">No meeting requests yet. When an investor books time with you, it appears here.</div>';
+}
+async function renderInvestorMeetings(){
+  var el=document.getElementById('investor-meetings'); if(!el) return;
+  var who = window._investorEmail || (typeof PROFILES!=='undefined'&&PROFILES.investor&&PROFILES.investor.name) || window._investorName || '';
+  if(!who) return;
+  var d; try{ d=await (await fetch('/api/meetings?investor='+encodeURIComponent(who))).json(); }catch(e){ return; }
+  var ms=(d&&d.meetings)||[];
+  el.innerHTML = ms.length ? ms.map(function(m){return _mtgRow(m,'investor');}).join('')
+    : "<div style=\"font-size:12px;color:var(--grey);padding:8px 0;\">No meetings yet. When you book a founder, it appears here to confirm once you've met.</div>";
+}
+async function confirmMeetingHeld(id, party){
+  try{ await fetch('/api/meeting/held',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meeting_id:id, party:party})}); }catch(e){}
+  if(party==='founder') renderFounderMeetings(); else renderInvestorMeetings();
 }
 
 // ---- Live meeting requests (admin marks each intro as sent) ---------------
@@ -6775,6 +6986,7 @@ function autofillFromDeck(ex){
   n+=_fillText('freePitch', ex.pitch); n+=_fillText('freeHq', ex.hq);
   n+=_fillText('raise-amount', ex.raise_amount); n+=_fillSelectVal('raise-currency', ex.raise_currency);
   n+=_fillSelectText('sectorSelect', ex.sector);
+  if(ex.sector) window._evalSector = String(ex.sector).trim();
   var stageMap={idea:'Pre-seed', pre_seed:'Pre-seed', seed:'Seed', series_a:'Series A', series_b_plus:'Series A'};
   n+=_fillSelectText('stageSelect', stageMap[ex.stage]||'');
   // Expert-review questionnaire (6 dimensions + Additional info)
@@ -6939,6 +7151,13 @@ function populateInterview(){
 // founder hasn't run a live diagnostic in this session.
 function populateReviewerReview(){
   var d = window._lastDiag, fs = window._freeStep || {};
+  // Founder's own questions for the expert (from the questionnaire), shown first.
+  var focusEl = document.getElementById('rev-focus-text'), focusWrap = document.getElementById('rev-focus-wrap');
+  if(focusEl){
+    var fq = (window._founderFocus || '').trim();
+    if(fq){ focusEl.textContent = fq; if(focusWrap) focusWrap.style.display=''; }
+    else if(focusWrap){ focusWrap.style.display='none'; }
+  }
   var list = document.getElementById('rev-packet-list');
   if(!list) return;
   if(!(d && d.live && d.findings && d.findings.length)) return; // keep sample
@@ -7046,26 +7265,40 @@ function _parseAmt(s){
   return n;
 }
 var RISK_BENCHMARK_INR=15000000; // ₹1.5 Cr / month (Saumil's traction signal)
+// Risk is judged RELATIVE TO STAGE (Arise/Ankita), not on absolute numbers: what's
+// normal at pre-seed is a red flag at Series A, and vice-versa.
 function computeRisk(inp){
   var flags=[], signals=[], tier='Lower';
   var stage=(inp.fundingStage||'').toLowerCase();
   var sl={idea:'Idea',pre_seed:'Pre-seed',seed:'Seed',series_a:'Series A',series_b_plus:'Series B+'}[stage]||'this stage';
+  var early = (stage==='idea'||stage==='pre_seed');
+  var late  = (stage==='series_a'||stage==='series_b_plus');
   var post=inp.revstage==='post';
+
+  // --- Revenue, judged against the stage rather than a flat pre-revenue=High rule ---
   if(!post){
-    flags.push('Pre-revenue — automatically flagged higher risk.'); tier='High';
-    if(stage==='seed'||stage==='series_a'||stage==='series_b_plus') flags.push('Milestone gap: still pre-revenue at '+sl+' stage.');
+    if(early){ signals.push('Pre-revenue — expected at '+sl+'; judge on team, problem and early evidence, not revenue.'); }
+    else if(stage==='seed'){ flags.push('Pre-revenue at Seed — acceptable, but the clock is running; look for first paying customers.'); if(tier==='Lower') tier='Medium'; }
+    else { flags.push('Milestone gap: still pre-revenue at '+sl+' — revenue would be expected by now.'); tier='High'; }
   } else {
     var rr=_parseAmt(inp.runrate);
-    if((inp.runrateCur||'INR')==='INR' && rr!=null){
-      if(rr<RISK_BENCHMARK_INR){ flags.push('Below the ₹1.5 Cr/month traction benchmark — early traction.'); tier='Medium';
-        if(stage==='series_a'||stage==='series_b_plus') flags.push('Milestone gap: traction below expectation for '+sl+'.'); }
-      else signals.push('Established traction — at or above ₹1.5 Cr/month.');
-    } else if(rr!=null){ signals.push('Run-rate reported in '+(inp.runrateCur||'a non-INR currency')+' — the ₹1.5 Cr/mo benchmark is not auto-applied.'); }
+    if(late && (inp.runrateCur||'INR')==='INR' && rr!=null && rr<RISK_BENCHMARK_INR){
+      flags.push('Traction below what '+sl+' investors expect (under ₹1.5 Cr/month).'); if(tier==='Lower') tier='Medium';
+    } else if(rr!=null){
+      signals.push('Post-revenue at '+sl+' — traction read relative to stage, not against an absolute bar.');
+    }
   }
+  // --- Leverage: structural, stage-independent ---
   var debt=_parseAmt(inp.debt), raise=_parseAmt(inp.raise);
   if(debt!=null && raise!=null && (inp.debtCur||'INR')===(inp.raiseCur||'INR') && raise>0 && debt>0.5*raise){
     flags.push('High leverage — current debt is a large share of the raise.'); if(tier==='Lower') tier='Medium';
   }
+  // --- Sector-specific context: some sectors are capital-intensive / long to revenue ---
+  var sec=(inp.sector||'').toLowerCase();
+  if(sec.indexOf('deep')>-1 || sec.indexOf('climate')>-1 || sec.indexOf('health')>-1){
+    signals.push('Capital-intensive / regulated sector — a longer path to revenue is normal here; weigh milestones, not just revenue.');
+  }
+  // --- De-risking signals (shown to context, never auto-lower the tier) ---
   if((inp.investors||'').trim()) signals.push('Existing backers on the cap table: '+inp.investors.trim());
   if((inp.track||'').trim()) signals.push('Team track record: '+inp.track.trim());
   return {tier:tier, flags:flags, signals:signals};
@@ -7117,7 +7350,7 @@ function renderRiskSnapshot(){
 function renderInvestorRisk(){
   var el=document.getElementById('investor-risk-strip'); if(!el) return;
   var inp={ fundingStage:'seed', revstage:'post', runrate:'3.5 L', runrateCur:'INR', debt:'0', debtCur:'INR',
-            raise:'6 Cr', raiseCur:'INR', investors:'Angel round + 1 micro-VC', track:'Founders sold a prior sales tool to 40 customers' };
+            raise:'6 Cr', raiseCur:'INR', sector:(window._evalSector||'B2B SaaS'), investors:'Angel round + 1 micro-VC', track:'Founders sold a prior sales tool to 40 customers' };
   var metrics=[['Raise','₹6 Cr'],['Revenue stage','Post-revenue · ₹3.5L/mo'],['Target','₹120 Cr by FY30'],['Expected return','~8x over 6 yrs']];
   renderRiskCard(el, computeRisk(inp), metrics, 'Risk & Returns (objective read)');
 }
@@ -7125,7 +7358,7 @@ function renderInvestorRisk(){
 function renderReviewerRisk(){
   var el=document.getElementById('reviewer-risk-strip'); if(!el) return;
   var inp={ fundingStage:'seed', revstage:'post', runrate:'3.5 L', runrateCur:'INR', debt:'0', debtCur:'INR',
-            raise:'6 Cr', raiseCur:'INR', investors:'Angel round + 1 micro-VC', track:'Founders sold a prior sales tool to 40 customers' };
+            raise:'6 Cr', raiseCur:'INR', sector:(window._evalSector||'B2B SaaS'), investors:'Angel round + 1 micro-VC', track:'Founders sold a prior sales tool to 40 customers' };
   var metrics=[['Raise','₹6 Cr'],['Revenue stage','Post-revenue · ₹3.5L/mo'],['Target','₹120 Cr by FY30'],['Expected return','~8x over 6 yrs']];
   renderRiskCard(el, computeRisk(inp), metrics, 'Risk & Returns (objective read · expert only)');
 }
@@ -7273,6 +7506,11 @@ function populateArtifacts(){
           + '<div style="flex:1;color:var(--dark);">'+_esc(r[1])+'</div></div>';
       });
       html += _artCard(7, 'Additional info', 'A few extra facts your reviewer and investors will want.', rows);
+    }
+    var focus=_artVal('q-focus');
+    if(focus){
+      html += _artCard('★', 'Your questions for the reviewer', 'Your reviewer sees this first and will address it in your review.',
+        '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--dark);">'+_esc(focus)+'</div>');
     }
     wrap.innerHTML=html;
   }

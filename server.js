@@ -45,6 +45,9 @@ function db_init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, company TEXT,
       role TEXT, phone TEXT, city TEXT, stage TEXT, sector TEXT, linkedin TEXT,
       created_at TEXT)`);
+  // Founder's own meeting scheduling link (any free tool) + which platform.
+  try { db.exec("ALTER TABLE founder ADD COLUMN scheduler_url TEXT DEFAULT ''"); } catch (e) {}
+  try { db.exec("ALTER TABLE founder ADD COLUMN scheduler_platform TEXT DEFAULT ''"); } catch (e) {}
   // Migration: older databases don't have password columns. SQLite has no
   // "ADD COLUMN IF NOT EXISTS", so we check the existing columns first.
   const cols = db.prepare("PRAGMA table_info(founder)").all().map((r) => r.name);
@@ -95,6 +98,13 @@ function db_init() {
   db.exec(`CREATE TABLE IF NOT EXISTS dataroom_view(
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, doc_id INTEGER,
       item_key TEXT, viewer TEXT, viewed_at TEXT)`);
+  // Per-document access control (shared / request / private). Older DBs get the
+  // column added here (default 'shared').
+  try { db.exec("ALTER TABLE dataroom_doc ADD COLUMN access TEXT DEFAULT 'shared'"); } catch (e) {}
+  // One row per (founder, document, investor) access request the founder decides on.
+  db.exec(`CREATE TABLE IF NOT EXISTS dataroom_access(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, item_key TEXT,
+      investor TEXT, status TEXT, requested_at TEXT, decided_at TEXT)`);
   // Admin allow-list: who may enter the Team/Admin portal. The super-admin edits
   // this from inside the portal, so this table is the LIVE source of truth. On
   // first run it is seeded from the super-admins + ADMIN_EMAILS (.env).
@@ -140,6 +150,10 @@ function db_init() {
       tie_status TEXT, cheque_size TEXT, focus TEXT, track_record TEXT,
       recent_investments TEXT, status TEXT DEFAULT 'pending', parent_investor_id INTEGER,
       decided_by TEXT, decided_at TEXT, created_at TEXT)`);
+  // Investor's own free scheduling link + platform (founders can book them back).
+  for (const _c of ["scheduler_url", "scheduler_platform"]) {
+    try { db.exec("ALTER TABLE investor ADD COLUMN " + _c + " TEXT DEFAULT ''"); } catch (e) {}
+  }
   // Meeting requests: an investor asks TiE to introduce them to a founder.
   // TiE facilitates every intro (no direct messaging). status walks:
   // 'requested' -> 'intro_sent' -> 'held' | 'declined'.
@@ -147,6 +161,13 @@ function db_init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
       startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
       status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)`);
+  // 'tie' (mediated) or 'scheduler' (investor clicked founder's Calendly/Meet link).
+  try { db.exec("ALTER TABLE meeting ADD COLUMN via TEXT DEFAULT 'tie'"); } catch (e) {}
+  // Two-sided "we met" confirmation → status 'held' when both sides confirm.
+  for (const _c of ["founder_confirmed", "investor_confirmed"]) {
+    try { db.exec("ALTER TABLE meeting ADD COLUMN " + _c + " INTEGER DEFAULT 0"); } catch (e) {}
+  }
+  try { db.exec("ALTER TABLE meeting ADD COLUMN held_at TEXT"); } catch (e) {}
   // Reviewers (TiE Charter Members). Same auth shape as founders: password OR
   // Google. TiE controls who reviews by assigning decks to a reviewer's email.
   db.exec(`CREATE TABLE IF NOT EXISTS reviewer(
@@ -341,6 +362,21 @@ function founder_get(fid) {
     }
   }
   return out;
+}
+
+function founder_set_scheduler(founder_id, url, platform) {
+  db.prepare("UPDATE founder SET scheduler_url=?, scheduler_platform=? WHERE id=?")
+    .run((url || "").trim(), (platform || "").trim(), founder_id);
+  return { ok: true, scheduler_url: (url || "").trim(), scheduler_platform: (platform || "").trim() };
+}
+function investor_set_scheduler(investor_id, url, platform) {
+  db.prepare("UPDATE investor SET scheduler_url=?, scheduler_platform=? WHERE id=?")
+    .run((url || "").trim(), (platform || "").trim(), investor_id);
+  return { ok: true, scheduler_url: (url || "").trim(), scheduler_platform: (platform || "").trim() };
+}
+function investor_get_scheduler(investor_id) {
+  const r = db.prepare("SELECT scheduler_url, scheduler_platform FROM investor WHERE id=?").get(investor_id);
+  return { scheduler_url: (r && r.scheduler_url) || "", scheduler_platform: (r && r.scheduler_platform) || "" };
 }
 
 function deck_add(founder_id, filename, raw) {
@@ -642,14 +678,75 @@ function dataroom_add(founder_id, item_key, filename, raw) {
 }
 
 function dataroom_list(founder_id) {
-  // Everything this founder has supplied, plus who has opened what.
+  // Founder view: docs (with access level), who opened what, and pending requests.
   const docs = db.prepare(
-    "SELECT id,item_key,filename,size,uploaded_at FROM dataroom_doc WHERE founder_id=? " +
-    "ORDER BY item_key").all(founder_id);
+    "SELECT id,item_key,filename,size,uploaded_at,COALESCE(access,'shared') AS access " +
+    "FROM dataroom_doc WHERE founder_id=? ORDER BY item_key").all(founder_id);
   const views = db.prepare(
     "SELECT item_key,viewer,viewed_at FROM dataroom_view WHERE founder_id=? " +
     "ORDER BY id DESC LIMIT 25").all(founder_id);
-  return { docs: docs, views: views };
+  const requests = db.prepare(
+    "SELECT item_key,investor,status,requested_at FROM dataroom_access WHERE founder_id=? " +
+    "ORDER BY id DESC").all(founder_id);
+  return { docs: docs, views: views, requests: requests };
+}
+
+const VALID_ACCESS = new Set(["shared", "request", "private"]);
+
+function dataroom_set_access(founder_id, item_key, access) {
+  if (!VALID_ACCESS.has(access)) return { error: "Invalid access level." };
+  db.prepare("UPDATE dataroom_doc SET access=? WHERE founder_id=? AND item_key=?").run(access, founder_id, item_key);
+  return { ok: true, item_key: item_key, access: access };
+}
+
+function dataroom_request_access(founder_id, item_key, investor) {
+  investor = (investor || "").trim();
+  if (!(founder_id && item_key && investor)) return { error: "Sign in as an investor to request access." };
+  const row = db.prepare("SELECT status FROM dataroom_access WHERE founder_id=? AND item_key=? AND investor=?")
+    .get(founder_id, item_key, investor);
+  let st;
+  if (row && (row.status === "approved" || row.status === "pending")) {
+    st = row.status;
+  } else if (row) {
+    db.prepare("UPDATE dataroom_access SET status='pending', requested_at=datetime('now'), decided_at=NULL " +
+      "WHERE founder_id=? AND item_key=? AND investor=?").run(founder_id, item_key, investor);
+    st = "pending";
+  } else {
+    db.prepare("INSERT INTO dataroom_access(founder_id,item_key,investor,status,requested_at) " +
+      "VALUES(?,?,?,'pending',datetime('now'))").run(founder_id, item_key, investor);
+    st = "pending";
+  }
+  return { ok: true, status: st };
+}
+
+function dataroom_decide_access(founder_id, item_key, investor, decision) {
+  const status = decision === "approve" ? "approved" : "declined";
+  db.prepare("UPDATE dataroom_access SET status=?, decided_at=datetime('now') " +
+    "WHERE founder_id=? AND item_key=? AND investor=?").run(status, founder_id, item_key, (investor || "").trim());
+  return { ok: true, status: status };
+}
+
+function dataroom_investor_view(founder_id, investor) {
+  investor = (investor || "").trim();
+  const docs = db.prepare(
+    "SELECT id,item_key,filename,size,uploaded_at,COALESCE(access,'shared') AS access " +
+    "FROM dataroom_doc WHERE founder_id=? ORDER BY item_key").all(founder_id);
+  const grants = {};
+  db.prepare("SELECT item_key,status FROM dataroom_access WHERE founder_id=? AND investor=?")
+    .all(founder_id, investor).forEach((r) => { grants[r.item_key] = r.status; });
+  const out = [];
+  docs.forEach((d) => {
+    const acc = d.access || "shared";
+    if (acc === "private") return;
+    let state;
+    if (acc === "shared") { state = "open"; }
+    else {
+      const st = grants[d.item_key];
+      state = st === "approved" ? "open" : (st === "pending" || st === "declined" ? st : "locked");
+    }
+    out.push({ id: d.id, item_key: d.item_key, filename: d.filename, size: d.size, uploaded_at: d.uploaded_at, state: state });
+  });
+  return { docs: out };
 }
 
 function dataroom_view_log(founder_id, doc_id, item_key, viewer) {
@@ -1308,10 +1405,11 @@ function meeting_request(d) {
       investor_name = investor_name || (inv.name || "");
     }
   }
+  const via = (d.via || "tie").trim() || "tie";
   const cur = db.prepare(
     "INSERT INTO meeting(founder_id, founder_name, startup, investor_id, investor_name, " +
-    "investor_email, status, requested_at) VALUES(?,?,?,?,?,?, 'requested', datetime('now'))"
-  ).run(founder_id, founder_name, startup, investor_id, investor_name, investor_email);
+    "investor_email, status, requested_at, via) VALUES(?,?,?,?,?,?, 'requested', datetime('now'), ?)"
+  ).run(founder_id, founder_name, startup, investor_id, investor_name, investor_email, via);
   const row = db.prepare("SELECT * FROM meeting WHERE id=?").get(cur.lastInsertRowid);
   notify("meeting_requested", ["admins"],
     "Meeting request: " + (investor_name || investor_email || "An investor") + " → " +
@@ -1327,6 +1425,25 @@ async function meeting_list(idToken) {
   const g = await require_admin(idToken);
   if (g.error) return g;
   return { meetings: db.prepare("SELECT * FROM meeting ORDER BY id DESC").all() };
+}
+
+function meetings_for_founder(founder_id) {
+  return { meetings: db.prepare("SELECT * FROM meeting WHERE founder_id=? ORDER BY id DESC").all(founder_id) };
+}
+function meetings_for_investor(who) {
+  who = (who || "").trim();
+  return { meetings: db.prepare("SELECT * FROM meeting WHERE investor_email=? OR investor_name=? ORDER BY id DESC").all(who.toLowerCase(), who) };
+}
+function meeting_confirm_held(meeting_id, party) {
+  const col = party === "founder" ? "founder_confirmed" : "investor_confirmed";
+  const row = db.prepare("SELECT * FROM meeting WHERE id=?").get(meeting_id);
+  if (!row) return { error: "Unknown meeting.", status: 404 };
+  db.prepare("UPDATE meeting SET " + col + "=1 WHERE id=?").run(meeting_id);
+  const r2 = db.prepare("SELECT * FROM meeting WHERE id=?").get(meeting_id);
+  if (r2.founder_confirmed && r2.investor_confirmed && r2.status !== "held") {
+    db.prepare("UPDATE meeting SET status='held', held_at=datetime('now') WHERE id=?").run(meeting_id);
+  }
+  return { ok: true };
 }
 
 async function meeting_intro_sent(idToken, meeting_id) {
@@ -2146,9 +2263,22 @@ async function handleGet(req, res, urlObj) {
     const fid = urlObj.searchParams.get("founder_id") || "";
     return sendJson(res, 200, fid ? review_state(fid) : { rounds: [], latest: null });
   }
+  if (p === "/api/meetings") {
+    const fid = urlObj.searchParams.get("founder_id") || "";
+    const inv = urlObj.searchParams.get("investor") || "";
+    if (fid) return sendJson(res, 200, meetings_for_founder(fid));
+    if (inv) return sendJson(res, 200, meetings_for_investor(inv));
+    return sendJson(res, 200, { meetings: [] });
+  }
+  if (p === "/api/investor/scheduler") {
+    const iid = urlObj.searchParams.get("investor_id") || "";
+    return sendJson(res, 200, iid ? investor_get_scheduler(iid) : { scheduler_url: "", scheduler_platform: "" });
+  }
   if (p === "/api/dataroom") {
     const fid = urlObj.searchParams.get("founder_id") || "";
-    return sendJson(res, 200, fid ? dataroom_list(fid) : { docs: [], views: [] });
+    const inv = urlObj.searchParams.get("investor") || "";
+    if (inv) return sendJson(res, 200, fid ? dataroom_investor_view(fid, inv) : { docs: [] });
+    return sendJson(res, 200, fid ? dataroom_list(fid) : { docs: [], views: [], requests: [] });
   }
   if (p === "/api/founder") {
     const fid = urlObj.searchParams.get("id") || "";
@@ -2198,6 +2328,12 @@ async function handlePost(req, res, urlObj, data) {
     return sendJson(res, 200, vm);
   } else if (p === "/api/founder") {
     return sendJson(res, 200, founder_upsert(data));
+  } else if (p === "/api/founder/scheduler") {
+    return sendJson(res, 200, founder_set_scheduler(data.founder_id, data.scheduler_url || "", data.scheduler_platform || ""));
+  } else if (p === "/api/investor/scheduler") {
+    return sendJson(res, 200, investor_set_scheduler(data.investor_id, data.scheduler_url || "", data.scheduler_platform || ""));
+  } else if (p === "/api/meeting/held") {
+    return sendJson(res, 200, meeting_confirm_held(data.meeting_id, data.party || ""));
   } else if (p === "/api/signup") {
     const out = await founder_signup(data);
     return sendJson(res, out.error ? 400 : 200, out);
@@ -2270,6 +2406,12 @@ async function handlePost(req, res, urlObj, data) {
     return sendJson(res, 200, out);
   } else if (p === "/api/dataroom/view") {
     return sendJson(res, 200, dataroom_view_log(data.founder_id, data.doc_id, data.item_key || "", data.viewer || ""));
+  } else if (p === "/api/dataroom/access") {
+    return sendJson(res, 200, dataroom_set_access(data.founder_id, data.item_key || "", data.access || ""));
+  } else if (p === "/api/dataroom/request") {
+    return sendJson(res, 200, dataroom_request_access(data.founder_id, data.item_key || "", data.investor || ""));
+  } else if (p === "/api/dataroom/decide") {
+    return sendJson(res, 200, dataroom_decide_access(data.founder_id, data.item_key || "", data.investor || "", data.decision || ""));
   } else if (p === "/api/diagnostic") {
     let deck_text = data.deck_text || "";
     const fileb64 = data.file_b64 || "";

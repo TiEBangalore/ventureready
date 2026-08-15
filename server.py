@@ -36,6 +36,11 @@ def db_init():
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, company TEXT,
         role TEXT, phone TEXT, city TEXT, stage TEXT, sector TEXT, linkedin TEXT,
         created_at TEXT)""")
+    # Founder's own meeting scheduling link (any free tool) — investors book direct.
+    try: conn.execute("ALTER TABLE founder ADD COLUMN scheduler_url TEXT DEFAULT ''")
+    except Exception: pass
+    try: conn.execute("ALTER TABLE founder ADD COLUMN scheduler_platform TEXT DEFAULT ''")
+    except Exception: pass
     # Migration: older databases don't have password columns. SQLite has no
     # "ADD COLUMN IF NOT EXISTS", so we check the existing columns first.
     _cols = [r["name"] for r in conn.execute("PRAGMA table_info(founder)").fetchall()]
@@ -78,6 +83,15 @@ def db_init():
     conn.execute("""CREATE TABLE IF NOT EXISTS dataroom_view(
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, doc_id INTEGER,
         item_key TEXT, viewer TEXT, viewed_at TEXT)""")
+    # Per-document access control. The founder sets each document to 'shared' (any
+    # NDA investor), 'request' (investor must ask; founder approves each one), or
+    # 'private' (nobody). Older DBs get the column added here (default 'shared').
+    try: conn.execute("ALTER TABLE dataroom_doc ADD COLUMN access TEXT DEFAULT 'shared'")
+    except Exception: pass
+    # One row per (founder, document, investor) access request the founder decides on.
+    conn.execute("""CREATE TABLE IF NOT EXISTS dataroom_access(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, item_key TEXT,
+        investor TEXT, status TEXT, requested_at TEXT, decided_at TEXT)""")
     # Admin allow-list: who may enter the Team/Admin portal. A super-admin edits
     # this from inside the portal, so this table is the LIVE source of truth. On
     # first run it is seeded from the super-admins + ADMIN_EMAILS (.env).
@@ -123,6 +137,10 @@ def db_init():
         tie_status TEXT, cheque_size TEXT, focus TEXT, track_record TEXT,
         recent_investments TEXT, status TEXT DEFAULT 'pending', parent_investor_id INTEGER,
         decided_by TEXT, decided_at TEXT, created_at TEXT)""")
+    # Investor's own free scheduling link + platform (founders can book them back).
+    for _c in ("scheduler_url", "scheduler_platform"):
+        try: conn.execute("ALTER TABLE investor ADD COLUMN %s TEXT DEFAULT ''" % _c)
+        except Exception: pass
     # Meeting requests: an investor asks TiE to introduce them to a founder.
     # TiE facilitates every intro (no direct messaging). status walks:
     # 'requested' -> 'intro_sent' -> 'held' | 'declined'.
@@ -130,6 +148,17 @@ def db_init():
         id INTEGER PRIMARY KEY AUTOINCREMENT, founder_id INTEGER, founder_name TEXT,
         startup TEXT, investor_id INTEGER, investor_name TEXT, investor_email TEXT,
         status TEXT DEFAULT 'requested', requested_at TEXT, intro_sent_at TEXT)""")
+    # How the meeting was initiated: 'tie' (TiE-mediated) or 'scheduler' (investor
+    # clicked the founder's Calendly/Meet link) — lets us measure booking click-through.
+    try: conn.execute("ALTER TABLE meeting ADD COLUMN via TEXT DEFAULT 'tie'")
+    except Exception: pass
+    # Two-sided "we met" confirmation: when BOTH sides confirm, status becomes 'held'
+    # — so TiE tracks meetings that actually happened, not just booking requests.
+    for _c in ("founder_confirmed", "investor_confirmed"):
+        try: conn.execute("ALTER TABLE meeting ADD COLUMN %s INTEGER DEFAULT 0" % _c)
+        except Exception: pass
+    try: conn.execute("ALTER TABLE meeting ADD COLUMN held_at TEXT")
+    except Exception: pass
     # Reviewers (TiE Charter Members). Same auth shape as founders: password OR
     # Google. TiE controls who reviews by assigning decks to a reviewer's email.
     conn.execute("""CREATE TABLE IF NOT EXISTS reviewer(
@@ -317,6 +346,29 @@ def founder_get(fid):
             }
     conn.close()
     return out
+
+def investor_set_scheduler(investor_id, url, platform=""):
+    """Save an investor's own scheduling link + free tool."""
+    conn = _db()
+    conn.execute("UPDATE investor SET scheduler_url=?, scheduler_platform=? WHERE id=?",
+                 ((url or "").strip(), (platform or "").strip(), investor_id))
+    conn.commit(); conn.close()
+    return {"ok": True, "scheduler_url": (url or "").strip(), "scheduler_platform": (platform or "").strip()}
+
+def investor_get_scheduler(investor_id):
+    conn = _db()
+    r = conn.execute("SELECT scheduler_url, scheduler_platform FROM investor WHERE id=?", (investor_id,)).fetchone()
+    conn.close()
+    return {"scheduler_url": (r["scheduler_url"] if r else "") or "",
+            "scheduler_platform": (r["scheduler_platform"] if r else "") or ""}
+
+def founder_set_scheduler(founder_id, url, platform=""):
+    """Save the founder's scheduling link + which free tool it's on."""
+    conn = _db()
+    conn.execute("UPDATE founder SET scheduler_url=?, scheduler_platform=? WHERE id=?",
+                 ((url or "").strip(), (platform or "").strip(), founder_id))
+    conn.commit(); conn.close()
+    return {"ok": True, "scheduler_url": (url or "").strip(), "scheduler_platform": (platform or "").strip()}
 
 def deck_add(founder_id, filename, raw):
     """Save the uploaded deck file to disk and record a row pointing to it."""
@@ -666,16 +718,90 @@ def dataroom_add(founder_id, item_key, filename, raw):
     return did
 
 def dataroom_list(founder_id):
-    """Everything this founder has supplied, plus who has opened what."""
+    """Founder view: everything supplied (with each doc's access level), who has
+    opened what, and every per-investor access request awaiting a decision."""
     conn = _db()
     docs = [dict(r) for r in conn.execute(
-        "SELECT id,item_key,filename,size,uploaded_at FROM dataroom_doc WHERE founder_id=? "
-        "ORDER BY item_key", (founder_id,)).fetchall()]
+        "SELECT id,item_key,filename,size,uploaded_at,COALESCE(access,'shared') AS access "
+        "FROM dataroom_doc WHERE founder_id=? ORDER BY item_key", (founder_id,)).fetchall()]
     views = [dict(r) for r in conn.execute(
         "SELECT item_key,viewer,viewed_at FROM dataroom_view WHERE founder_id=? "
         "ORDER BY id DESC LIMIT 25", (founder_id,)).fetchall()]
+    requests = [dict(r) for r in conn.execute(
+        "SELECT item_key,investor,status,requested_at FROM dataroom_access WHERE founder_id=? "
+        "ORDER BY id DESC", (founder_id,)).fetchall()]
     conn.close()
-    return {"docs": docs, "views": views}
+    return {"docs": docs, "views": views, "requests": requests}
+
+VALID_ACCESS = {"shared", "request", "private"}
+
+def dataroom_set_access(founder_id, item_key, access):
+    """Founder sets a single document's access level."""
+    if access not in VALID_ACCESS:
+        return {"error": "Invalid access level."}
+    conn = _db()
+    conn.execute("UPDATE dataroom_doc SET access=? WHERE founder_id=? AND item_key=?",
+                 (access, founder_id, item_key))
+    conn.commit(); conn.close()
+    return {"ok": True, "item_key": item_key, "access": access}
+
+def dataroom_request_access(founder_id, item_key, investor):
+    """Investor asks the founder for access to a request-only document."""
+    investor = (investor or "").strip()
+    if not (founder_id and item_key and investor):
+        return {"error": "Sign in as an investor to request access."}
+    conn = _db()
+    row = conn.execute("SELECT status FROM dataroom_access WHERE founder_id=? AND item_key=? AND investor=?",
+                       (founder_id, item_key, investor)).fetchone()
+    if row and row["status"] in ("approved", "pending"):
+        st = row["status"]
+    elif row:
+        conn.execute("UPDATE dataroom_access SET status='pending', requested_at=datetime('now'), decided_at=NULL "
+                     "WHERE founder_id=? AND item_key=? AND investor=?", (founder_id, item_key, investor))
+        st = "pending"
+    else:
+        conn.execute("INSERT INTO dataroom_access(founder_id,item_key,investor,status,requested_at) "
+                     "VALUES(?,?,?,'pending',datetime('now'))", (founder_id, item_key, investor))
+        st = "pending"
+    conn.commit(); conn.close()
+    return {"ok": True, "status": st}
+
+def dataroom_decide_access(founder_id, item_key, investor, decision):
+    """Founder approves or declines one investor's request for one document."""
+    status = "approved" if decision == "approve" else "declined"
+    conn = _db()
+    conn.execute("UPDATE dataroom_access SET status=?, decided_at=datetime('now') "
+                 "WHERE founder_id=? AND item_key=? AND investor=?",
+                 (status, founder_id, item_key, (investor or "").strip()))
+    conn.commit(); conn.close()
+    return {"ok": True, "status": status}
+
+def dataroom_investor_view(founder_id, investor):
+    """Investor view: only the documents this investor may see, each with a state —
+    'open' (shared or approved), 'pending', 'declined', or 'locked' (may request).
+    Private documents are never returned."""
+    investor = (investor or "").strip()
+    conn = _db()
+    docs = [dict(r) for r in conn.execute(
+        "SELECT id,item_key,filename,size,uploaded_at,COALESCE(access,'shared') AS access "
+        "FROM dataroom_doc WHERE founder_id=? ORDER BY item_key", (founder_id,)).fetchall()]
+    grants = {r["item_key"]: r["status"] for r in conn.execute(
+        "SELECT item_key,status FROM dataroom_access WHERE founder_id=? AND investor=?",
+        (founder_id, investor)).fetchall()}
+    conn.close()
+    out = []
+    for d in docs:
+        acc = d.get("access", "shared")
+        if acc == "private":
+            continue
+        if acc == "shared":
+            state = "open"
+        else:
+            st = grants.get(d["item_key"])
+            state = "open" if st == "approved" else (st if st in ("pending", "declined") else "locked")
+        out.append({"id": d["id"], "item_key": d["item_key"], "filename": d["filename"], "size": d["size"],
+                    "uploaded_at": d["uploaded_at"], "state": state})
+    return {"docs": out}
 
 def dataroom_view_log(founder_id, doc_id, item_key, viewer):
     conn = _db()
@@ -1411,10 +1537,11 @@ def meeting_request(d):
         if inv:
             investor_id = inv["id"]
             investor_name = investor_name or (inv["name"] or "")
+    via = (d.get("via") or "tie").strip() or "tie"
     cur = conn.execute(
         "INSERT INTO meeting(founder_id, founder_name, startup, investor_id, investor_name, "
-        "investor_email, status, requested_at) VALUES(?,?,?,?,?,?, 'requested', datetime('now'))",
-        (founder_id, founder_name, startup, investor_id, investor_name, investor_email))
+        "investor_email, status, requested_at, via) VALUES(?,?,?,?,?,?, 'requested', datetime('now'), ?)",
+        (founder_id, founder_name, startup, investor_id, investor_name, investor_email, via))
     mid = cur.lastrowid
     conn.commit()
     row = dict(conn.execute("SELECT * FROM meeting WHERE id=?", (mid,)).fetchone())
@@ -1436,6 +1563,38 @@ def meeting_list(id_token):
     rows = [dict(r) for r in conn.execute("SELECT * FROM meeting ORDER BY id DESC").fetchall()]
     conn.close()
     return {"meetings": rows}
+
+def meetings_for_founder(founder_id):
+    conn = _db()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM meeting WHERE founder_id=? ORDER BY id DESC", (founder_id,)).fetchall()]
+    conn.close()
+    return {"meetings": rows}
+
+def meetings_for_investor(who):
+    who = (who or "").strip()
+    conn = _db()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM meeting WHERE investor_email=? OR investor_name=? ORDER BY id DESC",
+        (who.lower(), who)).fetchall()]
+    conn.close()
+    return {"meetings": rows}
+
+def meeting_confirm_held(meeting_id, party):
+    """Founder or investor confirms the meeting happened. When BOTH have, it's 'held'."""
+    col = "founder_confirmed" if party == "founder" else "investor_confirmed"
+    conn = _db()
+    row = conn.execute("SELECT * FROM meeting WHERE id=?", (meeting_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": "Unknown meeting.", "status": 404}
+    conn.execute("UPDATE meeting SET %s=1 WHERE id=?" % col, (meeting_id,))
+    r2 = conn.execute("SELECT * FROM meeting WHERE id=?", (meeting_id,)).fetchone()
+    if r2["founder_confirmed"] and r2["investor_confirmed"] and r2["status"] != "held":
+        conn.execute("UPDATE meeting SET status='held', held_at=datetime('now') WHERE id=?", (meeting_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
 
 def meeting_intro_sent(id_token, meeting_id):
     # Admin confirms the introduction has been made: both sides are told.
@@ -2272,10 +2431,24 @@ class Handler(BaseHTTPRequestHandler):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             fid = (qs.get("founder_id") or [""])[0]
             return self._send(200, review_state(fid) if fid else {"rounds": [], "latest": None})
+        if path == "/api/meetings":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            fid = (qs.get("founder_id") or [""])[0]
+            inv = (qs.get("investor") or [""])[0]
+            if fid: return self._send(200, meetings_for_founder(fid))
+            if inv: return self._send(200, meetings_for_investor(inv))
+            return self._send(200, {"meetings": []})
+        if path == "/api/investor/scheduler":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            iid = (qs.get("investor_id") or [""])[0]
+            return self._send(200, investor_get_scheduler(iid) if iid else {"scheduler_url": "", "scheduler_platform": ""})
         if path == "/api/dataroom":
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             fid = (qs.get("founder_id") or [""])[0]
-            return self._send(200, dataroom_list(fid) if fid else {"docs": [], "views": []})
+            inv = (qs.get("investor") or [""])[0]
+            if inv:  # investor view — filtered to what this investor may see
+                return self._send(200, dataroom_investor_view(fid, inv) if fid else {"docs": []})
+            return self._send(200, dataroom_list(fid) if fid else {"docs": [], "views": [], "requests": []})
         if path == "/api/founder":
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             fid = (qs.get("id") or [""])[0]
@@ -2332,6 +2505,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, _vm)
             elif self.path == "/api/founder":
                 self._send(200, founder_upsert(data))
+            elif self.path == "/api/founder/scheduler":
+                self._send(200, founder_set_scheduler(data.get("founder_id"), data.get("scheduler_url", ""),
+                                                      data.get("scheduler_platform", "")))
+            elif self.path == "/api/investor/scheduler":
+                self._send(200, investor_set_scheduler(data.get("investor_id"), data.get("scheduler_url", ""),
+                                                       data.get("scheduler_platform", "")))
+            elif self.path == "/api/meeting/held":
+                self._send(200, meeting_confirm_held(data.get("meeting_id"), data.get("party", "")))
             elif self.path == "/api/signup":
                 out = founder_signup(data)
                 self._send(400 if out.get("error") else 200, out)
@@ -2398,6 +2579,15 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/dataroom/view":
                 self._send(200, dataroom_view_log(data.get("founder_id"), data.get("doc_id"),
                                                   data.get("item_key", ""), data.get("viewer", "")))
+            elif self.path == "/api/dataroom/access":  # founder sets a doc's access level
+                self._send(200, dataroom_set_access(data.get("founder_id"), data.get("item_key", ""),
+                                                    data.get("access", "")))
+            elif self.path == "/api/dataroom/request":  # investor asks for access
+                self._send(200, dataroom_request_access(data.get("founder_id"), data.get("item_key", ""),
+                                                        data.get("investor", "")))
+            elif self.path == "/api/dataroom/decide":  # founder approves/declines one investor
+                self._send(200, dataroom_decide_access(data.get("founder_id"), data.get("item_key", ""),
+                                                       data.get("investor", ""), data.get("decision", "")))
             elif self.path == "/api/diagnostic":
                 deck_text = data.get("deck_text", "")
                 fileb64 = data.get("file_b64", "")
