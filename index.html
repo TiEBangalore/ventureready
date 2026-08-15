@@ -134,7 +134,9 @@ footer.site-footer{border-top:1px solid var(--border);margin-top:60px;padding:24
 .cta-block h3{font-size:18px;font-weight:700;margin-bottom:6px;}
 .cta-block p{font-size:13px;color:var(--grey);line-height:1.55;max-width:440px;}
 .cta-block>div:first-child{flex:1 1 240px;min-width:220px;}
-.cta-right{text-align:right;flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;}
+.cta-right{flex:0 1 480px;min-width:0;margin-left:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.cta-right .btn{width:100%;}
+@media(max-width:520px){.cta-right{grid-template-columns:1fr;}}
 .cta-price{font-size:20px;font-weight:800;color:var(--dark);margin-bottom:12px;}
 .cta-price span{font-size:13px;font-weight:400;color:var(--grey);}
 
@@ -2351,7 +2353,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <h3 id="prof-cta-h">Interested in Stackr?</h3>
         <p>Book directly on the founder's calendar. Every booking request is logged so TiE can track the meetings the platform generates.</p>
       </div>
-      <div class="cta-right" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+      <div class="cta-right">
         <button class="btn btn-outline btn-lg" onclick="openDeck('investor-profile','NDA-signed investor')">View pitch deck</button>
         <button class="btn btn-outline btn-lg" onclick="go('investor-dataroom')">Open data room</button>
         <button class="btn btn-outline btn-lg" onclick="downloadFeedbackPDF('investor')">Download feedback (PDF)</button>
