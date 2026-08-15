@@ -2103,7 +2103,23 @@ def ai_diagnostic(deck_text, icp="", pitch="", images=None):
         "Watch for these known anti-patterns: " + ANTI_PATTERNS + ". "
         "End 'summary' with one sentence noting that a TiE expert reviewer would help them prioritise which of these fixes "
         "matters most for their specific raise and rework it for the investors they're about to meet. "
-        "Respond ONLY as JSON: {\"summary\": str, \"findings\": [{\"dim\": str, \"note\": str, \"fixes\": [str, str, ...]}, ...]}."
+        "SEPARATELY, EXTRACT structured facts from the deck to pre-fill the founder's intake and expert-review "
+        "questionnaire. STRICT GROUNDING — this is critical: extract ONLY facts EXPLICITLY stated in the deck. Do "
+        "NOT infer, estimate, calculate, convert, round, extrapolate or fill gaps. Copy names, numbers, currencies "
+        "and claims exactly as the deck states them — never adjust a figure. If a field is not clearly and directly "
+        "stated in the deck, or you are at all unsure, return an empty string for it. An empty field is ALWAYS better "
+        "than a guessed one; when in doubt, leave it blank. Do not carry facts from one company into another. "
+        "For 'stage' use exactly one of: idea, pre_seed, seed, series_a, "
+        "series_b_plus. For 'sector' use exactly one of: B2B SaaS, Fintech, Healthtech, Consumer, Climate & Deeptech, "
+        "Other. For 'raise_currency' use a 3-letter code (e.g. INR, USD). For 'revenue_stage' use exactly 'pre' or "
+        "'post'. 'company' is the venture being pitched (NOT a customer, competitor or investor); 'founder' is the "
+        "founder/CEO's name. "
+        "Respond ONLY as JSON: {\"summary\": str, \"findings\": [{\"dim\": str, \"note\": str, \"fixes\": [str, str, ...]}, ...], "
+        "\"extracted\": {\"company\": str, \"founder\": str, \"icp\": str, \"pitch\": str, \"stage\": str, "
+        "\"raise_amount\": str, \"raise_currency\": str, \"sector\": str, \"hq\": str, \"problem\": str, \"market\": str, "
+        "\"differentiation\": str, \"team\": str, \"traction\": str, \"unit_economics\": str, \"use_of_funds\": str, "
+        "\"revenue_stage\": str, \"run_rate\": str, \"debt\": str, \"target\": str, \"expected_return\": str, "
+        "\"existing_investors\": str, \"team_track_record\": str}}."
         + context + "\n\n"
         + ("The deck is image-based, so its slides are attached as pictures above rather than as text. "
            "Read the slides directly — including any charts, tables and infographics — and diagnose from what you see."
@@ -2120,9 +2136,9 @@ def ai_diagnostic(deck_text, icp="", pitch="", images=None):
         content = prompt
     body = json.dumps({
         "model": get_model(),
-        # Enough room for a full four-dimension read on a rich, multi-slide deck.
-        # Too small and the reply gets cut off mid-JSON and can't be parsed.
-        "max_tokens": 4096,
+        # Room for the four-dimension read PLUS the structured field extraction on a
+        # rich, multi-slide deck. Too small and the reply gets cut off mid-JSON.
+        "max_tokens": 8000,
         "messages": [{"role": "user", "content": content}],
     }).encode()
     req = urllib.request.Request(
@@ -2151,8 +2167,86 @@ def ai_diagnostic(deck_text, icp="", pitch="", images=None):
             ),
             "findings": [],
         }
+    # Mirror the extracted company name to the top level for the PDF/name logic.
+    ex = parsed.get("extracted") or {}
+    if isinstance(ex, dict) and ex.get("company"):
+        parsed["company"] = ex.get("company")
     parsed["live"] = True
     return parsed
+
+
+def market_context(sector, stage, target="", ret="", runrate=""):
+    """Deep-AI research surfaced ONLY at the expert-review stage: uses live web
+    search so the reviewer weighs the founder's claims against real, cited market
+    context. Always labelled 'AI-surfaced · verify' — never a verdict."""
+    if not ANTHROPIC_API_KEY:
+        return {"available": False,
+                "note": "Add an ANTHROPIC_API_KEY (with web search enabled) to surface live, cited market context here."}
+    claims = []
+    if target: claims.append("target: " + target)
+    if ret: claims.append("expected return: " + ret)
+    if runrate: claims.append("monthly run-rate: " + runrate)
+    prompt = (
+        "You are helping a TiE Bangalore expert reviewer AND an investor quickly get up to speed on a "
+        "startup's market before they dig in. Use web search to surface concise, CITED market context and "
+        "typical benchmarks for this company.\n\n"
+        "FORMAT YOUR ANSWER EXACTLY as these three sections and NOTHING else — no intro line, no closing "
+        "line. Each section is a '## ' heading followed by 1 to 3 bullets, each bullet on its own line "
+        "starting with '- '. Keep every bullet to one short sentence. Put the key numbers in **bold**.\n"
+        "## Return & growth expectations\n"
+        "(what return multiples / growth rates investors typically expect at this stage in this sector, vs "
+        "what the founder is claiming)\n"
+        "## Market size & growth\n"
+        "(the sector's size and growth rate)\n"
+        "## Comparable deals\n"
+        "(one or two comparable companies or recent funding rounds, if found)\n\n"
+        "This is STARTING CONTEXT to VERIFY — do NOT give an investment verdict or recommendation. If a "
+        "point is not covered by your allowed sources, write a single bullet saying so plainly rather than "
+        "guessing. Cite your sources.\n\n"
+        "Sector: " + (sector or "(not given)") + "\nStage: " + (stage or "(not given)") + "\n"
+        "Founder's claims: " + ("; ".join(claims) if claims else "(none given)")
+    )
+    # Trusted-source allowlist: web search is limited to these domains. Tune in
+    # .env (MARKET_CONTEXT_DOMAINS, comma-separated) without touching code; blank = open web.
+    # NOTE: WSJ, Economic Times (indiatimes) and Moneycontrol are rejected by the
+    # web-search provider (paywalled / opted out) — including any of them makes the
+    # whole search 400, so they are deliberately left out of the default list.
+    domains = [d.strip() for d in ENV.get("MARKET_CONTEXT_DOMAINS",
+               "yourstory.com,inc42.com,3one4capital.com,cnbc.com,"
+               "sequoiacap.com,bain.com,nielsen.com,mckinsey.com,tracxn.com,"
+               "crunchbase.com,news.crunchbase.com,bvp.com,techcrunch.com,"
+               "antler.co,ycombinator.com"
+               ).split(",") if d.strip()]
+    tool = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
+    if domains:
+        tool["allowed_domains"] = domains
+    body = json.dumps({
+        "model": get_model(),
+        "max_tokens": 1500,
+        "tools": [tool],
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=body, method="POST",
+        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            data = json.loads(r.read().decode())
+    except Exception as e:  # web search not enabled on the key, network, etc.
+        return {"available": False,
+                "note": "Live market search isn't available yet (the AI key may not have web search enabled). "
+                        "Error: " + str(e)[:180]}
+    text_parts, cites, seen = [], [], set()
+    for block in data.get("content", []):
+        if block.get("type") == "text":
+            text_parts.append(block.get("text", ""))
+            for c in (block.get("citations") or []):
+                url = c.get("url")
+                if url and url not in seen:
+                    seen.add(url)
+                    cites.append({"url": url, "title": c.get("title") or url})
+    return {"available": True, "text": "".join(text_parts).strip(),
+            "citations": cites, "model": data.get("model", ""), "domains": domains}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -2396,6 +2490,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/diagnostic/reset":
                 out = diagnostic_reset_demo(data.get("founder_id"), data.get("email", ""))
                 self._send(out.get("status", 400) if out.get("error") else 200, out)
+            elif self.path == "/api/market-context":
+                self._send(200, market_context(data.get("sector", ""), data.get("stage", ""),
+                                                data.get("target", ""), data.get("return", ""),
+                                                data.get("runrate", "")))
             elif self.path == "/api/reviewer/signup":
                 out = reviewer_signup(data)
                 self._send(400 if out.get("error") else 200, out)

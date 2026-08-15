@@ -1969,7 +1969,23 @@ async function ai_diagnostic(deck_text, icp = "", pitch = "", images = null) {
     "Watch for these known anti-patterns: " + ANTI_PATTERNS + ". " +
     "End 'summary' with one sentence noting that a TiE expert reviewer would help them prioritise which of these fixes " +
     "matters most for their specific raise and rework it for the investors they're about to meet. " +
-    "Respond ONLY as JSON: {\"summary\": str, \"findings\": [{\"dim\": str, \"note\": str, \"fixes\": [str, str, ...]}, ...]}." +
+    "SEPARATELY, EXTRACT structured facts from the deck to pre-fill the founder's intake and expert-review " +
+    "questionnaire. STRICT GROUNDING — this is critical: extract ONLY facts EXPLICITLY stated in the deck. Do " +
+    "NOT infer, estimate, calculate, convert, round, extrapolate or fill gaps. Copy names, numbers, currencies " +
+    "and claims exactly as the deck states them — never adjust a figure. If a field is not clearly and directly " +
+    "stated in the deck, or you are at all unsure, return an empty string for it. An empty field is ALWAYS better " +
+    "than a guessed one; when in doubt, leave it blank. Do not carry facts from one company into another. " +
+    "For 'stage' use exactly one of: idea, pre_seed, seed, series_a, " +
+    "series_b_plus. For 'sector' use exactly one of: B2B SaaS, Fintech, Healthtech, Consumer, Climate & Deeptech, " +
+    "Other. For 'raise_currency' use a 3-letter code (e.g. INR, USD). For 'revenue_stage' use exactly 'pre' or " +
+    "'post'. 'company' is the venture being pitched (NOT a customer, competitor or investor); 'founder' is the " +
+    "founder/CEO's name. " +
+    "Respond ONLY as JSON: {\"summary\": str, \"findings\": [{\"dim\": str, \"note\": str, \"fixes\": [str, str, ...]}, ...], " +
+    "\"extracted\": {\"company\": str, \"founder\": str, \"icp\": str, \"pitch\": str, \"stage\": str, " +
+    "\"raise_amount\": str, \"raise_currency\": str, \"sector\": str, \"hq\": str, \"problem\": str, \"market\": str, " +
+    "\"differentiation\": str, \"team\": str, \"traction\": str, \"unit_economics\": str, \"use_of_funds\": str, " +
+    "\"revenue_stage\": str, \"run_rate\": str, \"debt\": str, \"target\": str, \"expected_return\": str, " +
+    "\"existing_investors\": str, \"team_track_record\": str}}." +
     context + "\n\n" +
     (images ? "The deck is image-based, so its slides are attached as pictures above rather than as text. " +
       "Read the slides directly — including any charts, tables and infographics — and diagnose from what you see."
@@ -1991,7 +2007,7 @@ async function ai_diagnostic(deck_text, icp = "", pitch = "", images = null) {
     model: await get_model(),
     // Enough room for a full four-dimension read on a rich, multi-slide deck.
     // Too small and the reply gets cut off mid-JSON and can't be parsed.
-    max_tokens: 4096,
+    max_tokens: 8000,
     messages: [{ role: "user", content: content }],
   });
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -2024,8 +2040,83 @@ async function ai_diagnostic(deck_text, icp = "", pitch = "", images = null) {
       findings: [],
     };
   }
+  var ex = parsed.extracted || {};
+  if (ex && ex.company) parsed.company = ex.company;
   parsed.live = true;
   return parsed;
+}
+
+// Deep-AI research surfaced ONLY at the expert-review stage: uses live web search
+// so the reviewer weighs the founder's claims against real, cited market context.
+// Always labelled "AI-surfaced · verify" — never a verdict.
+async function market_context(sector, stage, target = "", ret = "", runrate = "") {
+  if (!ANTHROPIC_API_KEY) {
+    return { available: false, note: "Add an ANTHROPIC_API_KEY (with web search enabled) to surface live, cited market context here." };
+  }
+  const claims = [];
+  if (target) claims.push("target: " + target);
+  if (ret) claims.push("expected return: " + ret);
+  if (runrate) claims.push("monthly run-rate: " + runrate);
+  const prompt =
+    "You are helping a TiE Bangalore expert reviewer AND an investor quickly get up to speed on a " +
+    "startup's market before they dig in. Use web search to surface concise, CITED market context and " +
+    "typical benchmarks for this company.\n\n" +
+    "FORMAT YOUR ANSWER EXACTLY as these three sections and NOTHING else — no intro line, no closing " +
+    "line. Each section is a '## ' heading followed by 1 to 3 bullets, each bullet on its own line " +
+    "starting with '- '. Keep every bullet to one short sentence. Put the key numbers in **bold**.\n" +
+    "## Return & growth expectations\n" +
+    "(what return multiples / growth rates investors typically expect at this stage in this sector, vs " +
+    "what the founder is claiming)\n" +
+    "## Market size & growth\n" +
+    "(the sector's size and growth rate)\n" +
+    "## Comparable deals\n" +
+    "(one or two comparable companies or recent funding rounds, if found)\n\n" +
+    "This is STARTING CONTEXT to VERIFY — do NOT give an investment verdict or recommendation. If a " +
+    "point is not covered by your allowed sources, write a single bullet saying so plainly rather than " +
+    "guessing. Cite your sources.\n\n" +
+    "Sector: " + (sector || "(not given)") + "\nStage: " + (stage || "(not given)") + "\n" +
+    "Founder's claims: " + (claims.length ? claims.join("; ") : "(none given)");
+  // Trusted-source allowlist: web search is limited to these domains. Tune in
+  // .env (MARKET_CONTEXT_DOMAINS, comma-separated) without touching code; blank = open web.
+  // NOTE: WSJ, Economic Times (indiatimes) and Moneycontrol are rejected by the
+  // web-search provider (paywalled / opted out) — including any of them makes the
+  // whole search 400, so they are deliberately left out of the default list.
+  const domains = (ENV.MARKET_CONTEXT_DOMAINS ||
+    "yourstory.com,inc42.com,3one4capital.com,cnbc.com," +
+    "sequoiacap.com,bain.com,nielsen.com,mckinsey.com,tracxn.com," +
+    "crunchbase.com,news.crunchbase.com,bvp.com,techcrunch.com," +
+    "antler.co,ycombinator.com")
+    .split(",").map((d) => d.trim()).filter(Boolean);
+  const tool = { type: "web_search_20250305", name: "web_search", max_uses: 5 };
+  if (domains.length) tool.allowed_domains = domains;
+  const body = JSON.stringify({
+    model: await get_model(),
+    max_tokens: 1500,
+    tools: [tool],
+    messages: [{ role: "user", content: prompt }],
+  });
+  let d;
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: body,
+    });
+    d = await resp.json();
+    if (d && d.type === "error") throw new Error((d.error && d.error.message) || "API error");
+  } catch (e) {
+    return { available: false, note: "Live market search isn't available yet (the AI key may not have web search enabled). Error: " + String(e.message || e).slice(0, 180) };
+  }
+  const textParts = [], cites = [], seen = new Set();
+  for (const block of (d.content || [])) {
+    if (block && block.type === "text") {
+      textParts.push(block.text || "");
+      for (const c of (block.citations || [])) {
+        if (c.url && !seen.has(c.url)) { seen.add(c.url); cites.push({ url: c.url, title: c.title || c.url }); }
+      }
+    }
+  }
+  return { available: true, text: textParts.join("").trim(), citations: cites, model: d.model || "", domains: domains };
 }
 
 // ---- HTTP helpers ----
@@ -2278,6 +2369,9 @@ async function handlePost(req, res, urlObj, data) {
   } else if (p === "/api/diagnostic/reset") {
     const out = diagnostic_reset_demo(data.founder_id, data.email || "");
     return sendJson(res, out.error ? (out.status || 400) : 200, out);
+  } else if (p === "/api/market-context") {
+    const out = await market_context(data.sector || "", data.stage || "", data.target || "", data["return"] || "", data.runrate || "");
+    return sendJson(res, 200, out);
   } else if (p === "/api/reviewer/signup") {
     const out = reviewer_signup(data);
     return sendJson(res, out.error ? 400 : 200, out);

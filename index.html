@@ -1042,6 +1042,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     </div>
 
     <div class="form-group">
+      <label>Company / business name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(optional — we'll read it from your deck)</span></label>
+      <input type="text" id="freeCompany" placeholder="e.g. Stackr" />
+    </div>
+
+    <div class="form-group">
       <label>Who is it for? <span style="font-weight:400;text-transform:none;letter-spacing:0">(your ideal customer, in a few words)</span></label>
       <input type="text" id="freeIcp" placeholder="e.g. newly-hired VPs of Sales at Series A SaaS companies on Salesforce" />
     </div>
@@ -1106,11 +1111,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
     </div>
 
-    <div class="form-group">
-      <label>Industry / sector</label>
-      <select id="sectorSelect" onchange="renderDirectory()">
-        <option>B2B SaaS</option><option>Fintech</option><option>Healthtech</option><option>Consumer</option><option>Climate &amp; Deeptech</option><option>Other</option>
-      </select>
+    <div class="upload-grid">
+      <div class="form-group">
+        <label>Industry / sector</label>
+        <select id="sectorSelect" onchange="renderDirectory()">
+          <option>B2B SaaS</option><option>Fintech</option><option>Healthtech</option><option>Consumer</option><option>Climate &amp; Deeptech</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Headquarters <span style="font-weight:400;text-transform:none;letter-spacing:0">(city, country)</span></label>
+        <input type="text" id="freeHq" placeholder="e.g. Bangalore, India" />
+      </div>
     </div>
 
     <!-- Read-only investor directory, matched to industry + stage -->
@@ -1267,6 +1278,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       <p style="font-size:13px;color:var(--grey);">These are the questions a TiE expert will review. Answer for <strong>where you are today</strong> — the same six questions work at every stage. If you're early and don't have customers or revenue yet, share your <strong>hypothesis and earliest evidence</strong>; that's expected, and your reviewer weights the six dimensions by your stage.</p>
     </div>
 
+    <!-- Shown only when the AI pre-filled fields from the deck — the founder must verify. -->
+    <div id="autofill-note" style="display:none;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:13px 16px;margin-bottom:26px;font-size:12.5px;color:#92400E;line-height:1.6;">
+      <strong>We pre-filled some answers from your deck to save you time.</strong> These are a draft read of what your deck says — <strong>please check every field and correct anything that's off before you submit.</strong> The AI only fills what it finds and leaves the rest blank; it does not add numbers or claims your deck doesn't state.
+    </div>
+
     <!-- Carried over from the free step — populated from the founder's real free-diagnostic inputs + AI read (see populateInterview) -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:28px;">
       <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:10px;">Carried over from your free diagnostic</div>
@@ -1378,7 +1394,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <div style="margin-bottom:32px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border);">
             <div style="width:26px;height:26px;background:var(--dark);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">7</div>
-            <div style="font-size:14px;font-weight:800;">Deal &amp; Risk <span style="font-weight:600;color:var(--grey);font-size:12px;">— the facts investors screen on</span></div>
+            <div style="font-size:14px;font-weight:800;">Additional info <span style="font-weight:600;color:var(--grey);font-size:12px;">— a few extra facts your reviewer and investors will want</span></div>
           </div>
           <div class="form-group">
             <label>Use of funds — what does this raise buy?</label>
@@ -1418,7 +1434,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
             <label>Team track record — prior growth journeys</label>
             <input id="q-track" type="text" placeholder="e.g. Co-founder scaled a prior startup from ₹8 Cr to ₹100 Cr." />
           </div>
-          <div id="risk-snapshot" style="margin-top:4px;"></div>
+          <div style="margin-top:4px;font-size:11.5px;color:var(--grey);line-height:1.6;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px;">These details aren't scored here. They're shared with your expert reviewer and, once you earn the mark, with investors — so they can weigh your plan in context.</div>
         </div>
 
         <div style="display:flex;justify-content:flex-end;gap:12px;">
@@ -1462,42 +1478,23 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
   <div class="shell wide">
     <div class="art-hd">
       <div>
-        <div class="overline">Step 3 of 4 · Your Positioning Artifacts</div>
-        <h1>Your positioning artifacts</h1>
-        <p>1 revision remaining before expert review</p>
+        <div class="overline">Step 3 of 4 · Review your submission</div>
+        <h1>Review before expert review</h1>
+        <p>This is what a TiE expert will score — your answers across the six investor-readiness dimensions, plus your deal facts. Check them, then submit.</p>
       </div>
       <button class="btn btn-red" onclick="go('submitted')">Submit for Review →</button>
     </div>
     <div class="red-rule"></div>
 
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab(0,this)">Positioning Statement</button>
-      <button class="tab-btn" onclick="switchTab(1,this)">ICP Definition</button>
-      <button class="tab-btn" onclick="switchTab(2,this)">Messaging Hierarchy</button>
-      <button class="tab-btn" onclick="switchTab(3,this)">GTM Plan</button>
-    </div>
-
     <div class="art-layout">
-      <div>
-        <div class="art-text">
-          <p id="art-content">For <strong>newly-hired VPs of Sales at Series A SaaS companies</strong> (5–15 AE teams) who need to prove pipeline ROI within 90 days, [Product] is the <span class="validate-flag">VALIDATE</span> only sales-execution platform that surfaces deal risk in real time — unlike Gong or Clari, which report on the past.</p>
-        </div>
-        <div class="trace-section">
-          <h4>Claim Traceability</h4>
-          <div class="trace-row"><div class="tdot" style="background:var(--green)"></div>"Newly-hired VPs of Sales" → Stated · Interview Q4</div>
-          <div class="trace-row"><div class="tdot" style="background:var(--green)"></div>"90-day ROI" → Evidenced · 3 customer quotes, Interview Q7</div>
-          <div class="trace-row"><div class="tdot" style="background:#D97706"></div>"Only platform" → Assumed · Competitive validation required before expert review</div>
-        </div>
-      </div>
+      <div id="art-dims"></div>
       <div class="score-panel">
-        <h4>Positioning strength (AI read)</h4>
-        <div class="sp-item"><div class="sp-label">Positioning clarity</div><div class="pbar"><div class="pfill" style="width:71%"></div></div><div class="sp-pct">Strong</div></div>
-        <div class="sp-item"><div class="sp-label">ICP specificity</div><div class="pbar"><div class="pfill" style="width:68%"></div></div><div class="sp-pct">Solid</div></div>
-        <div class="sp-item"><div class="sp-label">Messaging hierarchy</div><div class="pbar"><div class="pfill" style="width:55%"></div></div><div class="sp-pct">Developing</div></div>
-        <div class="sp-item"><div class="sp-label">GTM sequencing</div><div class="pbar"><div class="pfill" style="width:44%"></div></div><div class="sp-pct">Priority gap</div></div>
-        <div class="insight-box" id="art-insight">
-          <strong>What investor-ready founders did differently</strong>
-          The strongest founders named a time-bound outcome AND a specific failure mode they prevent. You have the outcome — add the failure mode.
+        <h4>How the expert scores you</h4>
+        <div style="font-size:12px;color:var(--grey);line-height:1.6;margin-bottom:14px;">A TiE Charter Member scores each dimension on a Tier&nbsp;1–4 ladder (Tier&nbsp;1 is best). Tier&nbsp;2 on every dimension earns the VentureReady mark.</div>
+        <div id="art-dim-legend"></div>
+        <div class="insight-box">
+          <strong>Your free AI read covered positioning only</strong>
+          The free diagnostic scored four positioning dimensions. The paid expert review goes deeper — adding Team, Traction and Unit Economics that only a human can judge.
         </div>
       </div>
     </div>
@@ -1682,28 +1679,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
     <div style="margin-bottom:18px"><div class="overline">What happens next</div><h2 style="font-size:20px;font-weight:800;margin-top:5px">Your next steps</h2></div>
 
-    <div class="next-grid">
-      <div class="next-card">
-        <div class="next-icon"></div>
-        <div class="next-tag tag-green">4 Investors Matched</div>
-        <div class="next-title">Investor Introductions</div>
-        <div class="next-body">Your profile has been shared with 4 matched investors from the TiE network. Expect first outreach within 5 business days.</div>
-        <button class="next-link" onclick="nextAction('investors')">Take action →</button>
+    <!-- With the mark earned, the real next step is the (paid) data room. -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:240px;">
+        <div style="display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--red);background:#fdeaea;border-radius:999px;padding:4px 11px;margin-bottom:10px;">Now unlocked · Paid add-on</div>
+        <div style="font-size:16px;font-weight:800;color:var(--dark);margin-bottom:5px;">Open your data room</div>
+        <div style="font-size:12.5px;color:var(--grey);line-height:1.6;">With the VentureReady mark, you can open a secure data room for the documents investors ask for after a good meeting — cap table, shareholder agreement, SAFE notes. An optional add-on at <strong>₹5,000/yr</strong>; nothing to upload until you set it up.</div>
       </div>
-      <div class="next-card">
-        <div class="next-icon"></div>
-        <div class="next-tag tag-yellow">Session Available</div>
-        <div class="next-title">Mentor Match</div>
-        <div class="next-body">Based on your GTM gaps, we've flagged 2 TiE mentors with deep SaaS sales experience. Schedule your session below.</div>
-        <button class="next-link" onclick="nextAction('mentor')">Take action →</button>
-      </div>
-      <div class="next-card">
-        <div class="next-icon"></div>
-        <div class="next-tag tag-green">Slot Open</div>
-        <div class="next-title">Demo Day Eligibility</div>
-        <div class="next-body">You've cleared the positioning threshold for TiE Demo Day Q3 2026. Submit your 3-min video pitch to confirm your slot.</div>
-        <button class="next-link" onclick="nextAction('demoday')">Take action →</button>
-      </div>
+      <button class="btn btn-red btn-lg" style="flex-shrink:0;" onclick="go('dataroom')">Explore data room →</button>
     </div>
 
     <div class="expert-note">
@@ -1882,10 +1865,64 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
         <input type="email" id="inv-email" placeholder="you@fund.com" />
       </div>
       <div class="form-group">
-        <label>Firm / fund name</label>
+        <label>Firm / fund name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">(optional for angels)</span></label>
         <input type="text" id="inv-firm" placeholder="e.g. Orbit Ventures" />
       </div>
     </div>
+
+    <!-- Investor type drives which verification questions we ask (VC vs angel). -->
+    <div class="form-group">
+      <label>Investor type</label>
+      <select id="inv-type" onchange="applyInvestorType()">
+        <option value="vc" selected>Venture fund (VC)</option>
+        <option value="angel">Angel investor</option>
+        <option value="family_office">Family office / syndicate</option>
+      </select>
+      <div style="font-size:11px;color:var(--grey);margin-top:6px;line-height:1.5;">Every investor is verified by TiE Bangalore. What we ask next depends on your type.</div>
+    </div>
+
+    <!-- VC-only verification -->
+    <div id="inv-vc-fields">
+      <div class="upload-grid">
+        <div class="form-group">
+          <label>Fund size / AUM</label>
+          <input type="text" id="inv-fundsize" placeholder="e.g. ₹200 Cr · $25M" />
+        </div>
+        <div class="form-group">
+          <label>Which fund is this?</label>
+          <select id="inv-fundno"><option>Fund I</option><option>Fund II</option><option>Fund III</option><option>Fund IV or later</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notable investments in each fund <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--grey);">— name the standouts, by fund</span></label>
+        <textarea rows="3" id="inv-fundnotable" placeholder="e.g. Fund I — Stackr (lead), Ferra Health · Fund II — Loopwise, Nestcrew"></textarea>
+      </div>
+    </div>
+
+    <!-- Angel-only verification: is this a serious, active angel? -->
+    <div id="inv-angel-fields" style="display:none;">
+      <div class="upload-grid">
+        <div class="form-group">
+          <label>Angel investments made to date</label>
+          <input type="text" id="inv-angel-count" placeholder="e.g. 12" />
+        </div>
+        <div class="form-group">
+          <label>You usually…</label>
+          <select id="inv-angel-role"><option>Lead rounds</option><option>Co-invest / follow</option><option>Both</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notable portfolio companies or exits</label>
+        <textarea rows="3" id="inv-angel-portfolio" placeholder="e.g. Backed Stackr (2023, active); exited Loopwise to a strategic in 2025"></textarea>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;">
+          <input type="checkbox" id="inv-angel-accredited" style="margin-top:3px;flex-shrink:0;" />
+          <span style="font-size:12.5px;color:var(--dark);line-height:1.5;">I meet SEBI accredited-investor / net-worth norms and invest my own capital.</span>
+        </label>
+      </div>
+    </div>
+
     <div class="upload-grid">
       <div class="form-group">
         <label>Your TiE Bangalore status</label>
@@ -2279,6 +2316,18 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
       </div>
     </div>
 
+    <!-- Market context for the INVESTOR — cuts their own research time (Saumil: arrive already briefed) -->
+    <div style="border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:24px;background:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:13px;font-weight:800;color:var(--dark);">Market context <span style="font-weight:600;color:var(--grey);font-size:11px;">— a head-start on your own diligence</span></div>
+          <div style="font-size:11px;color:var(--grey);margin-top:2px;">The same live market read the TiE expert saw, so you arrive briefed instead of starting from scratch. Live web search, limited to a <strong>curated set of trusted business, startup &amp; VC sources</strong> (Inc42, YourStory, CNBC, Crunchbase, TechCrunch, Bain, McKinsey, Nielsen, Tracxn, Sequoia, Bessemer, Antler, Y&nbsp;Combinator, 3one4). <strong>A starting point — verify before relying.</strong> Never a verdict.</div>
+        </div>
+        <button class="btn btn-outline" id="mc-inv-btn" onclick="loadMarketContextInvestor()" style="font-size:12px;white-space:nowrap;">Surface market context →</button>
+      </div>
+      <div id="mc-inv-result" style="margin-top:14px;"></div>
+    </div>
+
     <div class="cta-block">
       <div>
         <h3 id="prof-cta-h">Interested in Stackr?</h3>
@@ -2518,6 +2567,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
           <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Team</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">Two co-founders: ex-VP Sales at a Series B SaaS (lived the problem) and an ex-Salesforce staff engineer (built on the platform). Shipped and sold a prior sales tool together to 40 customers.</div></div>
           <div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Traction</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">11 paying teams (₹0 → ₹42L ARR in 7 months), 3 signed LOIs, 92% logo retention. Acquired via outbound to VPs of Sales who joined in the last 90 days; closing in 2 calls with a 14-day trial.</div></div>
           <div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:5px;">Unit Economics</div><div style="font-size:13px;color:var(--dark);line-height:1.65;">₹8L/yr per team of 10 AEs; CAC ~₹1.2L (payback under 3 months); gross margin ~82%. Self-serve onboarding keeps cost-to-serve low as we scale.</div></div>
+        </div>
+
+        <!-- Risk & Returns (objective read) — EXPERT-ONLY. Never shown to the founder. -->
+        <div id="reviewer-risk-strip" style="margin-bottom:24px;"></div>
+
+        <!-- Market context (AI-surfaced via live web search — the reviewer verifies) -->
+        <div style="border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:24px;background:#fff;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:13px;font-weight:800;color:var(--dark);">Market context <span style="font-weight:600;color:var(--grey);font-size:11px;">— to check the growth/return claims against</span></div>
+              <div style="font-size:11px;color:var(--grey);margin-top:2px;">Live web search, limited to a <strong>curated set of trusted business, startup &amp; VC sources</strong> (Inc42, YourStory, CNBC, Crunchbase, TechCrunch, Bain, McKinsey, Nielsen, Tracxn, Sequoia, Bessemer, Antler, Y&nbsp;Combinator, 3one4). <strong>Starting context — verify before relying.</strong> Never a verdict.</div>
+            </div>
+            <button class="btn btn-outline" id="mc-btn" onclick="loadMarketContext()" style="font-size:12px;white-space:nowrap;">Surface market context →</button>
+          </div>
+          <div id="mc-result" style="margin-top:14px;"></div>
         </div>
 
         <!-- Step 3 — Written review -->
@@ -2943,28 +3007,51 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
   <div class="shell">
     <button class="btn btn-outline" style="margin-bottom:22px" onclick="go('profile')">← Back to profile</button>
 
-    <div class="overline">Diligence</div>
+    <div class="overline">VentureReady add-on</div>
     <h1 style="font-size:26px;font-weight:800;letter-spacing:-.5px;margin:6px 0 6px;">Your data room</h1>
-    <p style="font-size:13px;color:var(--grey);margin-bottom:22px;">This is what an investor asks for after a good meeting. A complete, well-organised room speeds up your round — an incomplete one signals you're not ready, however good the deck was.</p>
+    <p style="font-size:13px;color:var(--grey);margin-bottom:22px;">Now that you've earned the VentureReady mark, you can open a secure data room — the organised set of documents an investor asks for after a good meeting. It's an <strong>optional paid add-on</strong>, not something to prepare up front.</p>
 
-    <div class="dr-warn">
-      <span style="flex-shrink:0;"></span>
-      <div><strong>Prototype — do not upload real confidential documents yet.</strong> Secure login and encrypted storage are not live on this build. Until they are, use sample files only. Real cap tables, contracts and agreements should go in once the production security work is done.</div>
-    </div>
+    <!-- Paid add-on gate: shown until the founder unlocks it. No document uploads are requested here. -->
+    <div id="dr-gate" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:8px;">
+      <div style="display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--red);background:#fdeaea;border-radius:999px;padding:4px 11px;margin-bottom:12px;">Paid add-on · Unlocked by your mark</div>
+      <div style="font-size:16px;font-weight:800;color:var(--dark);margin-bottom:6px;">A secure data room for your raise</div>
+      <div style="font-size:12.5px;color:var(--grey);line-height:1.6;margin-bottom:16px;">Keep your cap table, agreements and diligence documents in one access-controlled room, and share it only with investors who've signed an NDA. Every open is logged and visible to you. You choose when to set it up — there's nothing to upload until you do.</div>
 
-    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
-        <div style="font-size:13px;font-weight:700;">Data room readiness</div>
-        <div class="rev-title rt-validator" id="dr-badge">0% ready</div>
+      <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--grey);margin-bottom:8px;">What investors ask for first</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:700;color:var(--dark);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">Cap table (fully diluted)</div>
+        <div style="font-size:12px;font-weight:700;color:var(--dark);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">Shareholder agreement (SHA)</div>
+        <div style="font-size:12px;font-weight:700;color:var(--dark);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">SAFE note templates</div>
       </div>
-      <div class="xp-bar"><div class="xp-fill" id="dr-fill" style="width:0%;"></div></div>
-      <div class="xp-next" id="dr-next"><strong>0 of 0 provided</strong></div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn btn-red btn-lg" style="font-size:13px;" onclick="drUnlock()">Unlock data room<span id="dr-price" style="font-weight:600;opacity:.85;"></span> →</button>
+        <button class="btn btn-outline" style="font-size:12.5px;" onclick="drConnectExternal()">Connect an existing deal room</button>
+      </div>
+      <div style="font-size:11px;color:var(--grey);line-height:1.55;">Prefer the tools you already use? You can connect an existing deal room instead of building one here. <span style="color:var(--mid);">Pricing and integrations are being finalised — this is a preview of the add-on.</span></div>
     </div>
 
-    <div id="dr-checklist"></div>
+    <!-- Unlocked content: only appears once the founder opts in. -->
+    <div id="dr-content" style="display:none;">
+      <div class="dr-warn" style="margin-top:8px;">
+        <span style="flex-shrink:0;"></span>
+        <div><strong>Prototype — do not upload real confidential documents yet.</strong> Secure login and encrypted storage aren't live on this build. Use sample files only until the production security work is done.</div>
+      </div>
 
-    <div class="dr-cat" style="margin-top:26px;">Who has opened your data room</div>
-    <div class="dr-views" id="dr-viewlist"></div>
+      <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+          <div style="font-size:13px;font-weight:700;">Data room readiness</div>
+          <div class="rev-title rt-validator" id="dr-badge">0% ready</div>
+        </div>
+        <div class="xp-bar"><div class="xp-fill" id="dr-fill" style="width:0%;"></div></div>
+        <div class="xp-next" id="dr-next"><strong>0 of 0 provided</strong></div>
+      </div>
+
+      <div id="dr-checklist"></div>
+
+      <div class="dr-cat" style="margin-top:26px;">Who has opened your data room</div>
+      <div class="dr-views" id="dr-viewlist"></div>
+    </div>
 
     <input type="file" id="dr-file" style="display:none" accept=".pdf,.pptx,.xlsx,.docx,.csv,.png,.jpg" />
   </div>
@@ -3038,10 +3125,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
       <div style="font-size:26px;flex-shrink:0;"></div>
       <div style="flex:1;min-width:220px;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Your data room <span id="prof-dr-pct" style="color:var(--red);"></span></div>
-        <div style="font-size:12px;color:var(--grey);line-height:1.55;">The mark opens the door; the data room is what an investor asks for next. See the 16 items a VC will want — and what you're still missing.</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Data room <span style="font-weight:600;color:var(--grey);font-size:11px;">— optional paid add-on</span> <span id="prof-dr-pct" style="color:var(--red);"></span></div>
+        <div style="font-size:12px;color:var(--grey);line-height:1.55;">Now that you're VentureReady, you can open a secure data room for the documents an investor asks for after a good meeting — cap table, agreements, SAFE notes. Set it up when you're ready; nothing to upload before then.</div>
       </div>
-      <button class="btn btn-red" style="font-size:12px;padding:8px 16px;flex-shrink:0;" onclick="go('dataroom')">Open data room →</button>
+      <button class="btn btn-outline" style="font-size:12px;padding:8px 16px;flex-shrink:0;" onclick="go('dataroom')">Explore data room →</button>
     </div>
 
     <!-- How you earned the mark: the re-review loop made visible -->
@@ -4485,31 +4572,17 @@ function togglePricing(){
 // ── VERDICT SCREEN ACTIONS ──────────────────────────────────────────────────
 // The three "next steps" are post-mark services TiE runs, so they route to the
 // people who run them rather than pretending to be self-serve features.
-function nextAction(kind){
-  if(kind === 'investors'){
-    alert('Investor introductions are made by the TiE Bangalore team, not self-serve.\n\n'
-      + 'Your profile is already with the matched investors. If an investor wants to meet, TiE will contact you to arrange it.\n\n'
-      + 'Use “Get help” if you want to talk to TiE about your matches.');
-    return;
-  }
-  if(kind === 'mentor'){
-    if(confirm('Request a mentor session through TiE?\n\nTiE Ops will match you with a mentor and contact you to schedule.\n\nOpen a request now?')) openSupport();
-    return;
-  }
-  if(kind === 'demoday'){
-    if(confirm('Demo Day slots are confirmed by the TiE Bangalore team once your 3-minute video pitch is submitted.\n\nOpen a request to confirm your slot?')) openSupport();
-    return;
-  }
-}
-
 // A real, printable credential — the founder earned it, so it should exist.
 function downloadCertificate(){
   var name = (typeof PROFILES!=='undefined' && PROFILES.founder && PROFILES.founder.name) ? PROFILES.founder.name : 'Founder';
+  var _efn=_getEvalFounder(); if(_efn) name=_efn;
   var co = 'Your Company';
   try{
     var rows = (PROFILES.founder && PROFILES.founder.rows) || [];
     rows.forEach(function(r){ if(r[0]==='Company' && r[1]) co = r[1]; });
   }catch(e){}
+  // The business being evaluated overrides the demo default (survives reloads).
+  var _ec = _getEvalCompany(); if(_ec) co = _ec;
   var issued = new Date().toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
   var w = window.open('', '_blank');
   if(!w){ alert('Please allow pop-ups to download your certificate.'); return; }
@@ -4621,6 +4694,10 @@ async function downloadFeedbackPDF(role){
       } else { expert = _FB_SAMPLE_EXPERT; }
     }
   }
+
+  // The business being evaluated overrides the demo default in every role (survives reloads).
+  var _ec = _getEvalCompany(); if(_ec) company = _ec;
+  var _ef = _getEvalFounder(); if(_ef) founder = _ef;
 
   // --- AI diagnostic side (live read if present this session, else sample) ---
   var diag = (window._lastDiag && window._lastDiag.findings && window._lastDiag.findings.length) ? window._lastDiag : _FB_SAMPLE_DIAG;
@@ -4970,6 +5047,15 @@ const DATAROOM_ITEMS = [
 
 function _drFmtSize(b){ return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
 
+// Data room is a PAID, post-VentureReady add-on. It stays gated until the founder
+// opts in — we never ask them to upload documents up front. Set DR_PRICE_LABEL to
+// show a price on the unlock button (e.g. '₹5,000 / yr'); leave blank to hide it.
+var DR_PRICE_LABEL = '₹5,000 / yr';
+function drUnlock(){ window._drUnlocked = true; renderDataRoom(); }
+function drConnectExternal(){
+  alert('Connect an existing deal room\n\nThis will let you link a deal room you already use (e.g. Ansarada, DealRoom, Google Drive) instead of building one here. Integration is being finalised — for now, unlock the built-in room to preview it.');
+}
+
 // The deck already uploaded for the free diagnostic counts toward the room.
 function _drDeckFromDiagnostic(){
   var f = (window._lastDiag && window._lastDiag.filename) || (window._freeStep && window._freeStep.filename);
@@ -4985,6 +5071,17 @@ async function _drFetch(){
 }
 
 async function renderDataRoom(){
+  // Paid add-on gate: nothing is shown or asked for until the founder opts in.
+  var gate=document.getElementById('dr-gate'), content=document.getElementById('dr-content');
+  var priceEl=document.getElementById('dr-price'); if(priceEl) priceEl.textContent = DR_PRICE_LABEL ? (' — '+DR_PRICE_LABEL) : '';
+  if(!window._drUnlocked){
+    if(gate) gate.style.display='';
+    if(content) content.style.display='none';
+    return;
+  }
+  if(gate) gate.style.display='none';
+  if(content) content.style.display='';
+
   var data = await _drFetch();
   var byKey = {}; (data.docs||[]).forEach(function(d){ byKey[d.item_key]=d; });
   var deckName = _drDeckFromDiagnostic();
@@ -5308,6 +5405,10 @@ async function founderLogin(){
 
 // Demo shortcut: ensure a saved demo-founder record exists so decks/diagnostics have an owner.
 async function demoFounder(){
+  // Fresh demo: forget any previously-evaluated business so PDFs default to Stackr
+  // until a new deck is actually run through the diagnostic.
+  window._evalCompany=''; window._evalFounder='';
+  try{ localStorage.removeItem('vr_eval_company'); localStorage.removeItem('vr_eval_founder'); }catch(e){}
   try{
     var r = await fetch('/api/founder',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:'Rohan Verma',email:'rohan@stackr.io',company:'Stackr',role:'Founder & CEO',city:'Bengaluru',stage:'Seed',sector:'B2B SaaS'})});
@@ -5661,15 +5762,33 @@ async function assignReviewer(founderId, btn){
 
 // ---- Investor application (real saved record + admin notification) --------
 function _v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+// Show the verification fields that match the chosen investor type (VC vs angel).
+function applyInvestorType(){
+  var t=(document.getElementById('inv-type')||{}).value||'vc';
+  var vc=document.getElementById('inv-vc-fields'), an=document.getElementById('inv-angel-fields');
+  if(vc) vc.style.display = (t==='vc') ? '' : 'none';
+  if(an) an.style.display = (t==='angel') ? '' : 'none';
+}
+
 async function submitInvestorApplication(btn){
   var msg=document.getElementById('inv-apply-msg');
   function show(t, ok){ if(!msg) return; msg.style.display=''; msg.style.color= ok?'var(--green)':'var(--red)'; msg.textContent=t; }
+  var invType=_v('inv-type')||'vc';
   var body={ name:_v('inv-name'), email:_v('inv-email'), firm:_v('inv-firm'),
+    investor_type:invType,
     tie_status:_v('inv-tie'), cheque_size:_v('inv-cheque'), focus:_v('inv-focus'),
-    track_record:_v('inv-track'), recent_investments:_v('inv-recent'), password:_v('inv-password') };
+    track_record:_v('inv-track'), recent_investments:_v('inv-recent'), password:_v('inv-password'),
+    // VC verification
+    fund_size:_v('inv-fundsize'), fund_number:_v('inv-fundno'), fund_notable:_v('inv-fundnotable'),
+    // Angel verification
+    angel_count:_v('inv-angel-count'), angel_role:_v('inv-angel-role'),
+    angel_portfolio:_v('inv-angel-portfolio'),
+    angel_accredited: !!(document.getElementById('inv-angel-accredited')||{}).checked };
   if(!body.name){ show('Please enter your full name.'); return; }
   if(!body.email){ show('Please enter your email address.'); return; }
   if(!body.password){ show('Please set a password so you can sign back in.'); return; }
+  if(invType==='vc' && !body.fund_size){ show('Please add your fund size / AUM so TiE can verify the fund.'); return; }
+  if(invType==='angel' && !body.angel_accredited){ show('Please confirm you meet the accredited-investor / net-worth norms.'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Submitting…'; }
   try{
     var r=await fetch('/api/investor/apply',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -6563,18 +6682,6 @@ function adminDemoSignIn(){
 }
 
 
-function switchTab(idx,btn){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const contents=[
-    'For <strong>newly-hired VPs of Sales at Series A SaaS companies</strong> (5–15 AE teams) who need to prove pipeline ROI within 90 days, [Product] is the <span class="validate-flag">VALIDATE</span> only sales-execution platform that surfaces deal risk in real time — unlike Gong or Clari, which report on the past.',
-    '<strong>Target segment:</strong> Series A B2B SaaS, 5–15 AE team, Salesforce CRM, trigger event = new VP of Sales hire within 90 days. Firmographic filter: $2M–$10M ARR, US-focused GTM, VC-backed.',
-    '<strong>Hero message:</strong> "Close more deals before the quarter ends." <strong>Level 2:</strong> Real-time deal risk signals your CRM never shows. <strong>Level 3:</strong> Built for VPs who need to prove ROI in 90 days, not 9 months.',
-    '<strong>First 90 days:</strong> Top-down VP of Sales wedge. Single logo, prove ROI, get a reference case study. <strong>Month 4–6:</strong> Expand to second team. <strong>Month 7+:</strong> Activate PLG within existing accounts.'
-  ];
-  document.getElementById('art-content').innerHTML=contents[idx];
-}
-
 // Live TiE Bangalore membership check (talks to the app's /api/verify-member endpoint)
 async function verifyMember(){
   var email=(document.getElementById('member-email').value||'').trim();
@@ -6632,6 +6739,56 @@ function _fileToB64(file){
 
 // Runs the free diagnostic: sends the real deck + the two quick prompts to the AI engine,
 // then renders the findings. Falls back to a sample result if no AI key is set.
+// The business being evaluated, remembered across reloads so every "save PDF"
+// export (feedback report + certificate) prints the right name, not the demo default.
+function _setEvalCompany(name){
+  name = (name||'').trim(); if(!name) return;
+  window._evalCompany = name;
+  try{ localStorage.setItem('vr_eval_company', name); }catch(e){}
+}
+function _getEvalCompany(){
+  if(window._evalCompany) return window._evalCompany;
+  try{ var s=localStorage.getItem('vr_eval_company'); if(s){ window._evalCompany=s; return s; } }catch(e){}
+  if(window._lastDiag && window._lastDiag.company) return String(window._lastDiag.company).trim();
+  return '';
+}
+// The founder's name for the "save PDF" exports — read off the deck, remembered across reloads.
+function _setEvalFounder(name){
+  name=(name||'').trim(); if(!name) return;
+  window._evalFounder=name; try{ localStorage.setItem('vr_eval_founder', name); }catch(e){}
+}
+function _getEvalFounder(){
+  if(window._evalFounder) return window._evalFounder;
+  try{ var s=localStorage.getItem('vr_eval_founder'); if(s){ window._evalFounder=s; return s; } }catch(e){}
+  return '';
+}
+// Pre-fill fields from the deck WITHOUT clobbering anything the founder already typed.
+function _fillText(id, val){ if(!val) return false; var e=document.getElementById(id); if(e && !String(e.value||'').trim()){ e.value=val; return true; } return false; }
+function _fillSelectVal(id, val){ if(!val) return false; var e=document.getElementById(id); if(!e) return false; for(var i=0;i<e.options.length;i++){ if(e.options[i].value===val){ e.selectedIndex=i; if(e.onchange) e.onchange(); return true; } } return false; }
+function _fillSelectText(id, txt){ if(!txt) return false; var e=document.getElementById(id); if(!e) return false; var t=String(txt).trim().toLowerCase(); for(var i=0;i<e.options.length;i++){ if(e.options[i].text.trim().toLowerCase()===t){ e.selectedIndex=i; if(e.onchange) e.onchange(); return true; } } return false; }
+// Auto-populate the AI-read intake AND the expert-review questionnaire from what the AI read off the deck.
+function autofillFromDeck(ex){
+  if(!ex) return;
+  var n=0;
+  // Free AI-read intake
+  n+=_fillText('freeCompany', ex.company); n+=_fillText('freeIcp', ex.icp);
+  n+=_fillText('freePitch', ex.pitch); n+=_fillText('freeHq', ex.hq);
+  n+=_fillText('raise-amount', ex.raise_amount); n+=_fillSelectVal('raise-currency', ex.raise_currency);
+  n+=_fillSelectText('sectorSelect', ex.sector);
+  var stageMap={idea:'Pre-seed', pre_seed:'Pre-seed', seed:'Seed', series_a:'Series A', series_b_plus:'Series A'};
+  n+=_fillSelectText('stageSelect', stageMap[ex.stage]||'');
+  // Expert-review questionnaire (6 dimensions + Additional info)
+  n+=_fillSelectVal('q-stage', ex.stage);
+  n+=_fillText('q-problem', ex.problem); n+=_fillText('q-market', ex.market); n+=_fillText('q-diff', ex.differentiation);
+  n+=_fillText('q-team', ex.team); n+=_fillText('q-traction', ex.traction); n+=_fillText('q-economics', ex.unit_economics);
+  n+=_fillText('q-usefunds', ex.use_of_funds); n+=_fillSelectVal('q-revstage', ex.revenue_stage);
+  n+=_fillText('q-runrate', ex.run_rate); n+=_fillText('q-debt', ex.debt); n+=_fillText('q-target', ex.target);
+  n+=_fillText('q-return', ex.expected_return); n+=_fillText('q-investors', ex.existing_investors);
+  n+=_fillText('q-track', ex.team_track_record);
+  if(ex.founder) _setEvalFounder(String(ex.founder).trim());
+  // If we pre-filled anything, ask the founder to verify it (never trust blind).
+  if(n>0){ var note=document.getElementById('autofill-note'); if(note) note.style.display=''; }
+}
 async function runDiagnostic(){
   go('diagnostic');
   var modeEl = document.getElementById('diag-mode');
@@ -6644,21 +6801,33 @@ async function runDiagnostic(){
   findEl.innerHTML = '';
 
   var payload = {
+    company: (document.getElementById('freeCompany')||{}).value || '',
     icp: (document.getElementById('freeIcp')||{}).value || '',
-    pitch: (document.getElementById('freePitch')||{}).value || ''
+    pitch: (document.getElementById('freePitch')||{}).value || '',
+    hq: (document.getElementById('freeHq')||{}).value || ''
   };
+  // The business being evaluated — used by every "save PDF" export. Persisted so it
+  // survives page reloads and navigation, not just the current in-memory session.
+  if(payload.company) _setEvalCompany(payload.company.trim());
   if(_deckFile){
     payload.filename = _deckFile.name;
     payload.file_b64 = await _fileToB64(_deckFile);
   }
   // Remember the founder's free-step inputs so later screens can carry them forward.
-  window._freeStep = { icp: payload.icp, pitch: payload.pitch, filename: payload.filename || '' };
+  window._freeStep = { company: payload.company, icp: payload.icp, pitch: payload.pitch, hq: payload.hq, filename: payload.filename || '' };
   if(window._founderId) payload.founder_id = window._founderId;   // so the deck + read get saved to this founder
 
   try{
     var r = await fetch('/api/diagnostic', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
     var d = await r.json();
     window._lastDiag = d;   // remember the AI read for the carried-over section
+    // If the founder didn't name the business, use the name the AI read off the deck.
+    if(!window._evalCompany && d && d.company){
+      _setEvalCompany(String(d.company).trim());
+      window._freeStep = window._freeStep || {}; window._freeStep.company = window._evalCompany;
+    }
+    // Auto-populate the intake + questionnaire from what the AI read off the deck.
+    if(d && d.extracted) autofillFromDeck(d.extracted);
     renderDiagnostic(d);
   }catch(e){
     sumEl.textContent = 'Could not reach the diagnostic service — make sure the app is running, then try again.';
@@ -6952,20 +7121,163 @@ function renderInvestorRisk(){
   var metrics=[['Raise','₹6 Cr'],['Revenue stage','Post-revenue · ₹3.5L/mo'],['Target','₹120 Cr by FY30'],['Expected return','~8x over 6 yrs']];
   renderRiskCard(el, computeRisk(inp), metrics, 'Risk & Returns (objective read)');
 }
+// Expert-only risk read on the reviewer screen. The founder never sees this.
+function renderReviewerRisk(){
+  var el=document.getElementById('reviewer-risk-strip'); if(!el) return;
+  var inp={ fundingStage:'seed', revstage:'post', runrate:'3.5 L', runrateCur:'INR', debt:'0', debtCur:'INR',
+            raise:'6 Cr', raiseCur:'INR', investors:'Angel round + 1 micro-VC', track:'Founders sold a prior sales tool to 40 customers' };
+  var metrics=[['Raise','₹6 Cr'],['Revenue stage','Post-revenue · ₹3.5L/mo'],['Target','₹120 Cr by FY30'],['Expected return','~8x over 6 yrs']];
+  renderRiskCard(el, computeRisk(inp), metrics, 'Risk & Returns (objective read · expert only)');
+}
+
+// Market context at the EXPERT stage: live web search, cited, verify-don't-trust.
+async function loadMarketContext(){
+  var btn=document.getElementById('mc-btn'), out=document.getElementById('mc-result');
+  if(!out) return;
+  out.innerHTML='<div style="font-size:12.5px;color:var(--grey);">Searching the web for market context — this takes a few seconds…</div>';
+  if(btn){ btn.disabled=true; btn.textContent='Searching…'; }
+  try{
+    var payload={ sector:(window._reviewSector||'B2B SaaS'), stage:(window._reviewStage||'seed'),
+                  target:'₹120 Cr by FY30', 'return':'~8x over 6 yrs', runrate:'₹3.5L/mo' };
+    var r=await fetch('/api/market-context',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    out.innerHTML=_renderMarketContext(await r.json());
+  }catch(e){ out.innerHTML='<div style="font-size:12.5px;color:#B42318;">Could not load market context — try again.</div>'; }
+  if(btn){ btn.disabled=false; btn.textContent='Refresh market context →'; }
+}
+// Same market read, surfaced to the INVESTOR on the deal profile to cut research time.
+async function loadMarketContextInvestor(){
+  var btn=document.getElementById('mc-inv-btn'), out=document.getElementById('mc-inv-result');
+  if(!out) return;
+  out.innerHTML='<div style="font-size:12.5px;color:var(--grey);">Searching the web for market context — this takes a few seconds…</div>';
+  if(btn){ btn.disabled=true; btn.textContent='Searching…'; }
+  try{
+    var payload={ sector:(window._profSector||'B2B SaaS'), stage:(window._profStage||'seed'),
+                  target:'₹120 Cr by FY30', 'return':'~8x over 6 yrs', runrate:'₹3.5L/mo' };
+    var r=await fetch('/api/market-context',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    out.innerHTML=_renderMarketContext(await r.json());
+  }catch(e){ out.innerHTML='<div style="font-size:12.5px;color:#B42318;">Could not load market context — try again.</div>'; }
+  if(btn){ btn.disabled=false; btn.textContent='Refresh market context →'; }
+}
+// Escape, then honour **bold** so key numbers stand out.
+function _mcInline(s){ return _esc(s||'').replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--dark);">$1</strong>'); }
+// Parse the AI's "## heading / - bullet" text into clean, scannable cards.
+function _mcParse(text){
+  var lines=(text||'').split(/\r?\n/), secs=[], cur=null, pre=[];
+  lines.forEach(function(raw){
+    var t=raw.trim(); if(!t) return;
+    var hd=t.match(/^#{1,6}\s+(.*)$/);
+    if(hd){ cur={title:hd[1].trim(), items:[]}; secs.push(cur); return; }
+    var bl=t.match(/^[-*•]\s+(.*)$/);
+    var body=bl?bl[1].trim():t;
+    if(cur) cur.items.push(body); else pre.push(body);
+  });
+  return {pre:pre, secs:secs};
+}
+function _renderMarketContext(d){
+  if(!d || d.available===false){
+    return '<div style="font-size:12.5px;color:var(--grey);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;line-height:1.6;">'+_esc((d&&d.note)||'Market context is not available right now.')+'</div>';
+  }
+  var p=_mcParse(d.text), h='';
+  function bullet(txt){
+    return '<div style="display:flex;gap:9px;align-items:flex-start;margin-top:7px;">'+
+             '<span style="flex:none;width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;"></span>'+
+             '<div style="font-size:12.5px;color:var(--dark);line-height:1.55;">'+_mcInline(txt)+'</div>'+
+           '</div>';
+  }
+  // Any stray text before the first heading (kept, but plain).
+  p.pre.forEach(function(t){ h+='<div style="font-size:12.5px;color:var(--dark);line-height:1.55;margin-bottom:8px;">'+_mcInline(t)+'</div>'; });
+  // Clean section cards.
+  p.secs.forEach(function(s){
+    h+='<div style="border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:10px;background:var(--surface);">'+
+         '<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--grey);">'+_esc(s.title)+'</div>';
+    if(s.items.length){ s.items.forEach(function(it){ h+=bullet(it); }); }
+    else { h+='<div style="font-size:12px;color:var(--grey);margin-top:6px;">Not covered by the allowed sources.</div>'; }
+    h+='</div>';
+  });
+  // Fallback: model didn't use headings — show the raw text cleanly rather than nothing.
+  if(!p.secs.length && !p.pre.length){
+    h+='<div style="font-size:12.5px;color:var(--dark);line-height:1.6;white-space:pre-wrap;">'+_esc(d.text||'')+'</div>';
+  }
+  // Sources as compact pill links.
+  if(d.citations && d.citations.length){
+    h+='<div style="margin-top:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--grey);margin-bottom:7px;">Sources — verify these</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:7px;">';
+    d.citations.forEach(function(c){
+      var host=(c.url||'').replace(/^https?:\/\//,'').split('/')[0].replace(/^www\./,'');
+      h+='<a href="'+_esc(c.url)+'" target="_blank" rel="noopener" title="'+_esc(c.title||c.url)+'" '+
+         'style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--dark);text-decoration:none;'+
+         'background:#fff;border:1px solid var(--border);border-radius:999px;padding:4px 11px;max-width:100%;">'+
+         '<span style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--red);"></span>'+
+         '<span style="font-weight:700;">'+_esc(host)+'</span>'+
+         '<span style="color:var(--grey);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">'+_esc(c.title||'')+'</span></a>';
+    });
+    h+='</div>';
+  }
+  h+='<div style="margin-top:12px;font-size:11px;color:var(--grey);border-top:1px solid var(--border);padding-top:9px;line-height:1.5;">AI-surfaced starting context — <strong style="color:var(--dark);">verify before relying</strong>. It can be outdated or wrong; your judgment and these sources are the authority, not the AI.</div>';
+  return h;
+}
 window.addEventListener('load', function(){
   populateCurrencySelects();
-  var q=document.getElementById('screen-interview');
-  if(q){ q.addEventListener('input', renderRiskSnapshot); q.addEventListener('change', renderRiskSnapshot); }
-  renderRiskSnapshot(); renderInvestorRisk();
+  // Risk read is expert/investor-only — never rendered on the founder questionnaire.
+  renderInvestorRisk(); renderReviewerRisk();
 });
 
 // Founder artifacts page: surface the real AI read in the insight box.
+// The six investor-readiness dimensions the founder answers in the questionnaire,
+// echoed back here so the pre-review screen reflects what the expert will score.
+var ARTIFACT_DIMS = [
+  {n:1, key:'q-problem',   name:'Problem',        hint:'The urgent problem, who feels it, and why now.'},
+  {n:2, key:'q-market',    name:'Market',         hint:'Size of the opportunity — and whether that spend is happening now.'},
+  {n:3, key:'q-diff',      name:'Differentiation',hint:'Your top alternatives, your edge, and why it is hard to copy.'},
+  {n:4, key:'q-team',      name:'Team',           hint:'Founder–market fit and what you have built or sold together.'},
+  {n:5, key:'q-traction',  name:'Traction',       hint:'Evidence customers want this, at your stage.'},
+  {n:6, key:'q-economics', name:'Unit Economics', hint:'What a single customer looks like economically.'}
+];
+function _artVal(id){ var el=document.getElementById(id); return el ? String(el.value||'').trim() : ''; }
+function _artSelText(id){ var e=document.getElementById(id); return (e && e.selectedIndex>=0) ? String((e.options[e.selectedIndex]||{}).text||'').trim() : ''; }
+function _artCard(n,name,hint,bodyHtml){
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+    + '<span style="width:24px;height:24px;flex:none;background:var(--dark);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">'+n+'</span>'
+    + '<span style="font-size:14px;font-weight:800;color:var(--dark);">'+name+'</span></div>'
+    + '<div style="font-size:11px;color:var(--grey);margin-bottom:8px;line-height:1.5;">'+hint+'</div>'
+    + bodyHtml + '</div>';
+}
 function populateArtifacts(){
-  var d = window._lastDiag;
-  var box = document.getElementById('art-insight');
-  if(box && d && d.live && d.summary){
-    box.innerHTML = '<strong>Your AI positioning read</strong> ' + _esc(d.summary);
+  var wrap=document.getElementById('art-dims');
+  if(wrap){
+    var html='';
+    ARTIFACT_DIMS.forEach(function(d){
+      var v=_artVal(d.key);
+      var body='<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;color:'+(v?'var(--dark)':'var(--mid)')+';">'
+        + (v?_esc(v):'Not answered yet — add this in the questionnaire before submitting.')+'</div>';
+      html += _artCard(d.n, d.name, d.hint, body);
+    });
+    // The 7th block: the Deal & Risk facts investors screen on.
+    var dr=[
+      ['Stage & round', _artSelText('q-stage')],
+      ['Use of funds', _artVal('q-usefunds')],
+      ['Revenue stage', _artSelText('q-revstage')],
+      ['Monthly run-rate', _artVal('q-runrate')],
+      ['Current debt', _artVal('q-debt')],
+      ['Target revenue & timeline', _artVal('q-target')],
+      ['Expected investor return', _artVal('q-return')],
+      ['Existing investors', _artVal('q-investors')],
+      ['Team track record', _artVal('q-track')]
+    ].filter(function(r){ return r[1]; });
+    if(dr.length){
+      var rows='';
+      dr.forEach(function(r){
+        rows += '<div style="display:flex;gap:12px;padding:6px 0;border-top:1px dashed #EEE;font-size:12.5px;">'
+          + '<div style="flex:0 0 42%;color:var(--grey);font-weight:600;">'+_esc(r[0])+'</div>'
+          + '<div style="flex:1;color:var(--dark);">'+_esc(r[1])+'</div></div>';
+      });
+      html += _artCard(7, 'Additional info', 'A few extra facts your reviewer and investors will want.', rows);
+    }
+    wrap.innerHTML=html;
   }
+  var leg=document.getElementById('art-dim-legend');
+  if(leg){ leg.innerHTML = ARTIFACT_DIMS.map(function(d){ return '<div class="sp-item"><div class="sp-label">'+d.n+'. '+d.name+'</div></div>'; }).join(''); }
 }
 
 // In-platform view-only deck viewer (no download). Opened by reviewer and NDA-signed investors.
