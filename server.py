@@ -141,6 +141,14 @@ def db_init():
     for _c in ("scheduler_url", "scheduler_platform"):
         try: conn.execute("ALTER TABLE investor ADD COLUMN %s TEXT DEFAULT ''" % _c)
         except Exception: pass
+    # Verification by type: VC (fund size / which fund / notable investments per fund)
+    # and angel (activity, lead-vs-follow, notable exits, accredited affirmation).
+    for _c in ("investor_type", "fund_size", "fund_number", "fund_notable",
+               "angel_count", "angel_role", "angel_portfolio"):
+        try: conn.execute("ALTER TABLE investor ADD COLUMN %s TEXT DEFAULT ''" % _c)
+        except Exception: pass
+    try: conn.execute("ALTER TABLE investor ADD COLUMN angel_accredited INTEGER DEFAULT 0")
+    except Exception: pass
     # Meeting requests: an investor asks TiE to introduce them to a founder.
     # TiE facilitates every intro (no direct messaging). status walks:
     # 'requested' -> 'intro_sent' -> 'held' | 'declined'.
@@ -1215,6 +1223,14 @@ def _investor_row(r):
             "nda_signed_at": (r["nda_signed_at"] if "nda_signed_at" in r.keys() else "") or "",
             "nda_name": (r["nda_name"] if "nda_name" in r.keys() else "") or "",
             "nda_signed": bool(("nda_signed_at" in r.keys()) and r["nda_signed_at"]),
+            "investor_type": (r["investor_type"] if "investor_type" in r.keys() else "") or "",
+            "fund_size": (r["fund_size"] if "fund_size" in r.keys() else "") or "",
+            "fund_number": (r["fund_number"] if "fund_number" in r.keys() else "") or "",
+            "fund_notable": (r["fund_notable"] if "fund_notable" in r.keys() else "") or "",
+            "angel_count": (r["angel_count"] if "angel_count" in r.keys() else "") or "",
+            "angel_role": (r["angel_role"] if "angel_role" in r.keys() else "") or "",
+            "angel_portfolio": (r["angel_portfolio"] if "angel_portfolio" in r.keys() else "") or "",
+            "angel_accredited": bool(("angel_accredited" in r.keys()) and r["angel_accredited"]),
             "created_at": r["created_at"] or ""}
 
 def investor_apply(d):
@@ -1265,6 +1281,14 @@ def investor_apply(d):
             (name, email, fields["firm"], fields["tie_status"], fields["cheque_size"],
              fields["focus"], fields["track_record"], fields["recent_investments"], pw_hash, pw_salt))
         iid = cur.lastrowid
+    # Verification fields (VC + angel) stored in one pass, keyed by the row we just wrote.
+    conn.execute(
+        "UPDATE investor SET investor_type=?, fund_size=?, fund_number=?, fund_notable=?, "
+        "angel_count=?, angel_role=?, angel_portfolio=?, angel_accredited=? WHERE id=?",
+        ((d.get("investor_type") or "").strip(), (d.get("fund_size") or "").strip(),
+         (d.get("fund_number") or "").strip(), (d.get("fund_notable") or "").strip(),
+         (d.get("angel_count") or "").strip(), (d.get("angel_role") or "").strip(),
+         (d.get("angel_portfolio") or "").strip(), 1 if d.get("angel_accredited") else 0, iid))
     conn.commit()
     row = conn.execute("SELECT * FROM investor WHERE id=?", (iid,)).fetchone()
     conn.close()
@@ -2806,11 +2830,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = 8000
+    # Honour the platform's port (Render/ZopDay/etc. inject PORT); default 8000 locally.
+    port = int(os.environ.get("PORT", "8000"))
     db_init()
     print("VentureReady demo running.  Open this in your browser:  http://localhost:%d" % port)
     print("Zoho member check: %s | AI key: %s" % (
         "ready" if ZOHO_CLIENT_ID else "MISSING",
         "set (live AI)" if ANTHROPIC_API_KEY else "not set (sample result)"))
     print("Press Ctrl+C here to stop the app.")
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    # Bind 0.0.0.0 so a cloud host's reverse proxy can reach it; localhost still works locally.
+    host = os.environ.get("HOST", "0.0.0.0")
+    ThreadingHTTPServer((host, port), Handler).serve_forever()
