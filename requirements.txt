@@ -1,0 +1,5 @@
+# Python deps for server.py — pitch-deck parsing (PDF/PPTX text + slide images).
+# Without these the deployed server can't read uploaded decks.
+pypdf>=4.2.0
+python-pptx>=0.6.23
+Pillow>=10.2.0
